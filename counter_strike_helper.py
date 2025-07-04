@@ -129,8 +129,8 @@ def attack_UDP(method, host_url, port, duration, threads_per_method=100):
         stop_event.set()
 
         # (Optional but good practice) Wait for all threads to finish cleanly
-        # for thread in threads:
-        #     thread.join()
+        for thread in threads:
+            thread.join()
 
         print(f"--- Test function for {method} has finished. ---")
 
