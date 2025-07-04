@@ -1,5 +1,3 @@
-#/usr/bin/python3
-#Source - https://github.com/EmreOvunc/Icmp-Syn-Flood
 from scapy.all import *
 from scapy.layers.inet import IP, ICMP, TCP
 
