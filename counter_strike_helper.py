@@ -10,8 +10,6 @@ import sys
 import threading
 import time
 
-loops = 10000
-
 
 def resolve_to_ipv4(target: str) -> list[str]:
     """
