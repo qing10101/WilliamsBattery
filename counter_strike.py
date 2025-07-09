@@ -22,7 +22,7 @@ SOFTWARE."""
 
 
 import threading
-import counter_strike_helper  # Assuming your helper functions are in this file
+import counter_strike_helper
 
 
 def full_scale_counter_strike(target):
