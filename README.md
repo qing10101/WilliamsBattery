@@ -1,129 +1,72 @@
-William's Battery - A Multi-Vector DoS Toolkit
+# William's Battery - A Multi-Vector DoS Toolkit
 
-![alt text](https://img.shields.io/badge/python-3.8%2B-blue)
+![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Educational Use](https://img.shields.io/badge/purpose-educational-lightgrey.svg)
 
+William's Battery is a powerful, multi-threaded Python-based toolkit designed for demonstrating and researching various Denial of Service (DoS) attack vectors. It can launch blended, simultaneous attacks and features an adaptive mode that intelligently adjusts the attack based on the target's status.
 
-![alt text](https://img.shields.io/badge/License-MIT-yellow.svg)
+## ⚠️ Legal & Ethical Disclaimer
 
+> **This tool is intended for educational and research purposes ONLY.**
+>
+> Using this software to attack any server, network, or service that you do **not** have explicit, written permission to test is **illegal**. The author is not responsible for any damage, harm, or legal consequences resulting from the misuse of this tool.
+>
+> **Always respect the law and ethical principles. Use responsibly in a controlled lab environment.**
 
-![alt text](https://img.shields.io/badge/purpose-educational-lightgrey.svg)
+## 🚀 Features
 
-William's Battery is a powerful, multi-threaded Python-based toolkit designed for demonstrating and researching various Denial of Service (DoS) attack vectors. It can launch blended, simultaneous attacks to simulate a complex cyber-attack scenario for security testing and network infrastructure stress-testing.
+-   **Blended, Multi-Threaded Attacks:** Launches UDP, TCP SYN, ICMP, and HTTP floods simultaneously.
+-   **Efficient Worker Pool Model:** Uses a professional, fixed-thread-pool model for high performance and low resource consumption.
+-   **Multiple Flood Vectors:** UDP, TCP SYN, ICMP, and HTTP GET floods.
+-   **Configurable Attack Profiles:**
+    -   **Full Scale (Siege):** A prolonged, high-volume attack across a wide range of vectors.
+    -   **Fast Scale (Surgical Strike):** A short, intense, and focused attack on critical services.
+    -   **Adaptive (Smart Strike):** An intelligent attack that monitors the target's status, automatically pausing the flood when the target is down and resuming it upon recovery. This maximizes efficiency and conserves attacker resources.
 
-The project was intended to serve as the "counterstrike" branch for an email scam identification software of a college SWE project.
+## ⚙️ Prerequisites & Installation
 
-⚠️ Legal & Ethical Disclaimer
+-   Python 3.8 or newer.
+-   `pip` for installing packages.
+-   **Root or Administrator privileges** to craft and send raw packets with Scapy.
 
-This tool is intended for educational and research purposes ONLY.
+**Installation Steps:**
 
-Using this software to attack any server, network, or service that you do not have explicit, written permission to test is illegal. The author is not responsible for any damage, harm, or legal consequences resulting from the misuse of this tool.
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/WilliamsBattery.git
+    cd WilliamsBattery
+    ```
 
-Always respect the law and ethical principles. Use responsibly in a controlled lab environment.
+2. **Install requirements:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-🚀 Features
+## 🕹️ Usage
 
-Blended, Multi-Threaded Attacks: Launches UDP, TCP SYN, ICMP, and HTTP floods simultaneously to create a complex and effective attack simulation.
+The script must be run with `sudo` (on Linux/macOS) or as an Administrator (on Windows).
 
-Multiple Flood Vectors:
-
-UDP Flood: Saturates bandwidth and exhausts UDP-based services.
-
-TCP SYN Flood: Aims to exhaust the server's connection state table.
-
-ICMP Flood: A classic "Ping Flood" to saturate the network.
-
-HTTP GET Flood: Overwhelms web server applications (Layer 7).
-
-Configurable Attack Profiles:
-
-Full Scale Counterstrike (Siege): A prolonged, high-volume attack across a wide range of ports and vectors.
-
-Fast Counterstrike (Surgical Strike): A short, intense, and focused attack on the most critical services for maximum immediate impact.
-
-Modular and Readable Code: The attack logic is separated into a helper module for clarity and easy extension.
-
-⚙️ Prerequisites & Installation
-
-To run this tool, you will need:
-
-Python 3.8 or newer.
-
-pip for installing packages.
-
-Root or Administrator privileges to craft and send raw packets with Scapy.
-
-Installation Steps:
-
-Clone the repository:
-
-git clone https://github.com/qing10101/WilliamsBattery.git
-
-cd WilliamsBattery
-
-Install the required Python packages:
-
-pip install -r requirements.txt
-
-🕹️ Usage
-
-The script is run from the command line and will prompt you for the target and attack profile.
-
-IMPORTANT: You must run the script with sudo (on Linux/macOS) or as an Administrator (on Windows) for the SYN and ICMP floods to work correctly.
-
+```bash
 sudo python3 main.py
+```
 
-The script will then guide you through the process:
+The script will then guide you through selecting a target and an attack profile.
 
-------------------------------------------------------------
-WELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL
-------------------------------------------------------------
-This tool is for educational purposes ONLY. Use responsibly and legally.
-Please Enter The Domain Name Of Your Target: example.com
-Target: example.com
+## 🛡️ Attack Profiles Explained
 
-Select an attack profile:
-  1: Full Scale Counterstrike (Long-running siege, all vectors)
-  2: Fast Counterstrike (Short, intense, focused attack)
+### 1. Full Scale Counterstrike (Siege)
+A sustained, overwhelming assault designed to test long-term infrastructure resilience.
 
-Please enter your option: 2
+### 2. Fast Counterstrike (Surgical Strike)
+A quick, high-impact burst on critical services to simulate a hit-and-run attack.
 
-🛡️ Attack Profiles Explained
-1. Full Scale Counterstrike (Siege)
+### 3. Adaptive Counterstrike (Smart Strike)
+The most advanced profile. It launches an attack and a background controller that periodically checks the target's health.
+-   **If Target is UP:** The attack continues at full force.
+-   **If Target is DOWN:** The attack automatically pauses, saving your bandwidth and CPU.
+-   **If Target Recovers:** The attack instantly resumes.
 
-This profile is designed for a sustained, overwhelming assault.
+## 📄 License
 
-Duration: Long (e.g., 360 seconds per UDP attack).
-
-Volume: Extremely high packet and request counts.
-
-Scope: Broad. It targets a wide range of common ports for SYN floods and performs a UDP flood scan across the first 1024 ports.
-
-Use Case: Simulating a persistent, large-scale DoS attack to test the long-term resilience of network infrastructure and mitigation systems.
-
-2. Fast Counterstrike (Surgical Strike)
-
-This profile is designed for a quick, high-impact burst.
-
-Duration: Short (e.g., 60 seconds per UDP attack).
-
-Volume: High, but lower than the siege profile, optimized for a fast-and-done attack.
-
-Scope: Focused. It targets only the most critical service ports (Web, SSH, RDP, DNS) to maximize the chance of immediate disruption.
-
-Use Case: Simulating a hit-and-run style attack or performing a quick stress test on primary services.
-
-🏗️ Code Architecture
-
-The project is structured for clarity and maintainability:
-
-main.py: The entry point of the application. It handles user interaction (getting the target and profile choice) and calls the appropriate attack function.
-
-counter_strike_helper.py: A module containing the core logic for each individual attack vector (attack_UDP, synflood, icmpflood, attack_http_flood). This separation of concerns makes the code easier to manage and extend.
-
-🤝 Contributing
-
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-
-📄 License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the `LICENSE` file for details.

