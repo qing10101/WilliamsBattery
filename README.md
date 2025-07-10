@@ -56,7 +56,7 @@ Installation Steps:
 
 Clone the repository:
 
-git clone https://github.com/your-username/williams-battery.git
+git clone https://github.com/qing10101/WilliamsBattery.git
 cd williams-battery
 
 Install the required Python packages:
