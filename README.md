@@ -56,49 +56,23 @@ Installation Steps:
 
 Clone the repository:
 
-Generated bash
-git clone https://github.com/your-username/williams-battery.git
+git clone https://github.com/qing10101/WilliamsBattery.git
 cd williams-battery
-
-
-Create a requirements.txt file in the project directory with the following content:
-
-Generated code
-scapy
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-IGNORE_WHEN_COPYING_END
 
 Install the required Python packages:
 
-Generated bash
 pip install -r requirements.txt
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Bash
-IGNORE_WHEN_COPYING_END
+
 🕹️ Usage
 
 The script is run from the command line and will prompt you for the target and attack profile.
 
 IMPORTANT: You must run the script with sudo (on Linux/macOS) or as an Administrator (on Windows) for the SYN and ICMP floods to work correctly.
 
-Generated bash
 sudo python3 main.py
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Bash
-IGNORE_WHEN_COPYING_END
 
 The script will then guide you through the process:
 
-Generated text
 ------------------------------------------------------------
 WELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL
 ------------------------------------------------------------
@@ -111,12 +85,7 @@ Select an attack profile:
   2: Fast Counterstrike (Short, intense, focused attack)
 
 Please enter your option: 2
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Text
-IGNORE_WHEN_COPYING_END
+
 🛡️ Attack Profiles Explained
 1. Full Scale Counterstrike (Siege)
 
