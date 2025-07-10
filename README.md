@@ -34,7 +34,7 @@ William's Battery is a powerful, multi-threaded Python-based toolkit designed fo
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/WilliamsBattery.git
+    git clone https://github.com/qing10101/WilliamsBattery.git
     cd WilliamsBattery
     ```
 
