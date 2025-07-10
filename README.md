@@ -70,7 +70,7 @@ The script is run from the command line and will prompt you for the target and a
 
 IMPORTANT: You must run the script with sudo (on Linux/macOS) or as an Administrator (on Windows) for the SYN and ICMP floods to work correctly.
 
-sudo python3 counter_strike.py
+sudo python3 main.py
 
 The script will then guide you through the process:
 
@@ -116,7 +116,7 @@ Use Case: Simulating a hit-and-run style attack or performing a quick stress tes
 
 The project is structured for clarity and maintainability:
 
-counter_strike.py: The entry point of the application. It handles user interaction (getting the target and profile choice) and calls the appropriate attack function.
+main.py: The entry point of the application. It handles user interaction (getting the target and profile choice) and calls the appropriate attack function.
 
 counter_strike_helper.py: A module containing the core logic for each individual attack vector (attack_UDP, synflood, icmpflood, attack_http_flood). This separation of concerns makes the code easier to manage and extend.
 
