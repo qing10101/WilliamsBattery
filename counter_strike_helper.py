@@ -1,10 +1,5 @@
 # counter_strike_helper.py
 
-import socket
-import string
-import random
-import threading
-import time
 from scapy.all import *
 from scapy.layers.inet import IP, ICMP, TCP
 
