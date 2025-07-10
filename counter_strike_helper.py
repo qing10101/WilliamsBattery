@@ -93,7 +93,7 @@ def udp_worker(stop_event, pause_event, target_ip, port, packet_size):
         pass
 
 
-def attack_UDP(method, target_url, port, duration, stop_event, pause_event, threads=150):
+def attack_udp(method, target_url, port, duration, stop_event, pause_event, threads=150):
     """Controller for UDP flood attacks."""
     ips = resolve_to_ipv4(target_url)
     if not ips: return
