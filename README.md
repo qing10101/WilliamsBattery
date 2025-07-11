@@ -4,7 +4,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Educational Use](https://img.shields.io/badge/purpose-educational-lightgrey.svg)
 
-William's Battery is a powerful, multi-threaded Python-based toolkit designed for demonstrating and researching various Denial of Service (DoS) attack vectors. It can launch blended, simultaneous attacks and features an adaptive mode that intelligently adjusts the attack based on the target's status.
+William's Battery is a powerful, multi-threaded Python-based toolkit for demonstrating and researching a wide array of Denial of Service (DoS) attack vectors. It launches sophisticated, blended attacks to simulate complex cyber-attack scenarios for security testing and network infrastructure stress-testing.
 
 ## ⚠️ Legal & Ethical Disclaimer
 
@@ -16,19 +16,26 @@ William's Battery is a powerful, multi-threaded Python-based toolkit designed fo
 
 ## 🚀 Features
 
--   **Blended, Multi-Threaded Attacks:** Launches UDP, TCP SYN, ICMP, and HTTP floods simultaneously.
--   **Efficient Worker Pool Model:** Uses a professional, fixed-thread-pool model for high performance and low resource consumption.
--   **Multiple Flood Vectors:** UDP, TCP SYN, ICMP, and HTTP GET floods.
--   **Configurable Attack Profiles:**
-    -   **Full Scale (Siege):** A prolonged, high-volume attack across a wide range of vectors.
-    -   **Fast Scale (Surgical Strike):** A short, intense, and focused attack on critical services.
-    -   **Adaptive (Smart Strike):** An intelligent attack that monitors the target's status, automatically pausing the flood when the target is down and resuming it upon recovery. This maximizes efficiency and conserves attacker resources.
+-   **Blended, Multi-Threaded Attacks:** Launches multiple attack vectors simultaneously to create a complex and effective attack simulation.
+-   **Adaptive Attack Controller:** An intelligent mode that monitors the target's status, automatically pausing the attack when the target is down and resuming it upon recovery to maximize efficiency.
+-   **Comprehensive Attack Vectors:**
+    -   **Layer 7 (Application):**
+        -   **HTTP/2 Rapid Reset:** A highly efficient attack exploiting the H2 protocol to cause maximum CPU load with minimal bandwidth.
+        -   **HTTP POST Flood:** Bypasses caches by sending randomized POST data, forcing expensive server-side processing.
+        -   **Slowloris:** A stealthy "low and slow" attack that exhausts the server's connection pool with minimal traffic.
+        -   **DNS Query Flood:** A smart attack that floods the target with valid but randomized DNS queries, overwhelming the DNS resolver application.
+    -   **Layer 3/4 (Network & Transport):**
+        -   **TCP SYN Flood:** The classic attack to exhaust the server's connection state table.
+        -   **TCP Fragmentation Attack:** A memory exhaustion attack that targets firewalls and OS network stacks by sending incomplete packet fragments.
+        -   **UDP Flood:** A volumetric attack to saturate network bandwidth.
+        -   **ICMP Flood:** A classic "Ping Flood" for network saturation.
+-   **Configurable Attack Profiles:** Choose from pre-configured strategies for different testing scenarios.
 
 ## ⚙️ Prerequisites & Installation
 
 -   Python 3.8 or newer.
 -   `pip` for installing packages.
--   **Root or Administrator privileges** to craft and send raw packets with Scapy.
+-   **Root or Administrator privileges** to craft and send raw packets.
 
 **Installation Steps:**
 
@@ -38,14 +45,14 @@ William's Battery is a powerful, multi-threaded Python-based toolkit designed fo
     cd WilliamsBattery
     ```
 
-2. **Install requirements:**
+2.  **Install the required Python packages:**
     ```bash
     pip install -r requirements.txt
     ```
 
 ## 🕹️ Usage
 
-The script must be run with `sudo` (on Linux/macOS) or as an Administrator (on Windows).
+The script must be run with `sudo` (on Linux/macOS) or as an Administrator (on Windows) for most attacks to function correctly.
 
 ```bash
 sudo python3 main.py
@@ -55,17 +62,39 @@ The script will then guide you through selecting a target and an attack profile.
 
 ## 🛡️ Attack Profiles Explained
 
-### 1. Full Scale Counterstrike (Siege)
-A sustained, overwhelming assault designed to test long-term infrastructure resilience.
+The toolkit offers three distinct strategic profiles, each combining different attack vectors.
 
-### 2. Fast Counterstrike (Surgical Strike)
-A quick, high-impact burst on critical services to simulate a hit-and-run attack.
+### 1. Full Scale Counterstrike (The Siege)
 
-### 3. Adaptive Counterstrike (Smart Strike)
-The most advanced profile. It launches an attack and a background controller that periodically checks the target's health.
--   **If Target is UP:** The attack continues at full force.
--   **If Target is DOWN:** The attack automatically pauses, saving your bandwidth and CPU.
--   **If Target Recovers:** The attack instantly resumes.
+This profile is a comprehensive, "kitchen sink" assault designed for maximum pressure across the entire technology stack. It is a long-running siege meant to test long-term resilience.
+
+-   **Strategy:** Overwhelm everything at once.
+-   **Includes:** `UDP Flood`, `SYN Flood`, `ICMP Flood`, `DNS Query Flood`, **`TCP Fragmentation`**, **`HTTP POST Flood`**, **`Slowloris`**, and **`HTTP/2 Rapid Reset`**.
+
+### 2. Fast Counterstrike (The Surgical Strike)
+
+This profile is a short, intense burst designed for maximum impact in minimum time. It prioritizes the most efficient and modern attack vectors.
+
+-   **Strategy:** Cripple the target's services quickly and effectively.
+-   **Includes:** `DNS Query Flood`, `SYN Flood`, **`HTTP POST Flood`**, and **`HTTP/2 Rapid Reset`**.
+
+### 3. Adaptive Counterstrike (The Smart Strike)
+
+This profile uses the potent "Fast Scale" vector set but adds an intelligent controller. It's designed for efficient, long-running tests where attacker resources are a consideration.
+
+-   **Strategy:** Apply pressure only when the target is online, conserving resources when it's down.
+-   **Includes:** The same powerful vector set as the Fast Counterstrike, managed by the adaptive controller.
+
+## 🏗️ Code Architecture
+
+The project is structured for clarity and maintainability:
+
+-   `main.py`: The entry point of the application. Handles user interaction and orchestrates the blended attack profiles.
+-   `counter_strike_helper.py`: A module containing the core logic for each individual attack vector, each designed around a professional "worker pool" model for efficiency and control.
+
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## 📄 License
 
