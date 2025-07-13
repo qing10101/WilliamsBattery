@@ -29,7 +29,6 @@ William's Battery is a powerful, multi-threaded Python-based toolkit for demonst
     -   **Layer 3/4 (Network & Transport):**
         -   **TCP SYN Flood:** The classic attack to exhaust the server's connection state table.
         -   **TCP Fragmentation Attack:** A memory exhaustion attack that targets firewalls and OS network stacks by sending incomplete packet fragments.
-        -   **DNS Amplification Attack:** A powerful DRDoS attack that reflects and amplifies traffic off open DNS resolvers to generate a massive flood.
         -   **UDP Flood:** A volumetric attack to saturate network bandwidth.
         -   **ICMP Flood:** A classic "Ping Flood" for network saturation.
 -   **Configurable Attack Profiles:** Choose from pre-configured strategies for different testing scenarios.
@@ -86,7 +85,7 @@ The toolkit offers three distinct strategic profiles, each combining different a
 This profile is a comprehensive, "kitchen sink" assault designed for maximum pressure across the entire technology stack. It is a long-running siege meant to test long-term resilience.
 
 -   **Strategy:** Overwhelm everything at once.
--   **Includes:** `DNS Amplification`, `UDP Flood`, `SYN Flood`, `ICMP Flood`, `TCP Fragmentation`, `DNS Query Flood`, **`Cache-Busting GET Flood`**, `HTTP POST Flood`, `Slowloris`, and `HTTP/2 Rapid Reset`.
+-   **Includes:** `UDP Flood`, `SYN Flood`, `ICMP Flood`, `TCP Fragmentation`, `DNS Query Flood`, **`Cache-Busting GET Flood`**, `HTTP POST Flood`, `Slowloris`, and `HTTP/2 Rapid Reset`.
 
 ### 2. Fast Counterstrike (The Surgical Strike)
 
