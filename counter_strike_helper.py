@@ -429,7 +429,7 @@ def h2_rapid_reset_worker(stop_event, pause_event, target_ip, port, host_header)
 
                 # A very brief sleep to prevent this thread from consuming 100% CPU
                 # on a single core just from the Python loop itself.
-                time.sleep(0.04)
+                time.sleep(0.01)
 
             except Exception:
                 # If any error occurs (e.g., server closes connection), break the loop
