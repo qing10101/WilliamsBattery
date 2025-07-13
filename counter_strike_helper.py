@@ -484,7 +484,8 @@ def tcp_fragmentation_worker(stop_event, pause_event, target_ip, port):
 def attack_tcp_fragmentation(target_url, port, duration, stop_event, pause_event, threads=150):
     """Controller for TCP Fragmentation attacks."""
     ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    if not ips:
+        return
 
     attack_end_time = time.time() + duration
     for ip in ips:
