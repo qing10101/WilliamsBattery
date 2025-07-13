@@ -8,6 +8,7 @@ import time
 from scapy.all import *
 from scapy.layers.inet import IP, ICMP, TCP, UDP, fragment
 from scapy.layers.dns import DNS, DNSQR
+from scapy.volatile import RandString
 # Add the h2 library to your imports
 import h2.connection
 import h2.events
