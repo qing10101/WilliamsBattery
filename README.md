@@ -19,40 +19,24 @@ William's Battery is a powerful, multi-threaded Python-based toolkit for demonst
 -   **Blended, Multi-Threaded Attacks:** Launches multiple attack vectors simultaneously to create a complex and effective attack simulation.
 -   **Adaptive Attack Controller:** An intelligent mode that monitors the target's status, automatically pausing the attack when the target is down and resuming it upon recovery to maximize efficiency.
 -   **Anonymity via Tor:** Integrates with the Tor network to route application-layer attacks through a SOCKS proxy, masking the operator's real IP address for those vectors.
+-   **Auto-Detect Network Interface:** Automatically identifies the correct network interface for Scapy-based attacks, preventing silent failures in complex network environments.
 -   **Comprehensive Attack Vectors:**
-    -   **Layer 7 (Application):**
-        -   **HTTP/2 Rapid Reset:** A highly efficient attack exploiting the H2 protocol to cause maximum CPU load with minimal bandwidth.
-        -   **HTTP POST Flood:** Bypasses caches by sending randomized POST data, forcing expensive server-side processing and database load.
-        -   **HTTP GET Flood (Cache-Busting):** Defeats CDNs and caching layers by sending GET requests with randomized query parameters, forcing the origin server to render a new page for every request.
-        -   **Slowloris:** A stealthy "low and slow" attack that exhausts the server's connection pool with minimal traffic.
-        -   **DNS Query Flood:** A smart attack that floods the target with valid but randomized DNS queries, overwhelming the DNS resolver application.
-    -   **Layer 3/4 (Network & Transport):**
-        -   **TCP SYN Flood:** The classic attack to exhaust the server's connection state table.
-        -   **TCP Fragmentation Attack:** A memory exhaustion attack that targets firewalls and OS network stacks by sending incomplete packet fragments.
-        -   **UDP Flood:** A volumetric attack to saturate network bandwidth.
-        -   **ICMP Flood:** A classic "Ping Flood" for network saturation.
--   **Configurable Attack Profiles:** Choose from pre-configured strategies for different testing scenarios.
+    -   **Layer 7 (Application):** HTTP/2 Rapid Reset, HTTP POST Flood, Cache-Busting GET Flood, Slowloris, DNS Query Flood.
+    -   **Layer 3/4 (Network & Transport):** TCP SYN Flood, TCP ACK Flood, TCP Fragmentation Attack, UDP Flood, and ICMP Flood.
+-   **Tuned Attack Profiles:** Choose from pre-configured strategies that are optimized for different testing scenarios and resource levels.
 
 ## ⚙️ Prerequisites & Installation
 
 -   Python 3.8 or newer.
 -   `pip` for installing packages.
 -   **Root or Administrator privileges** to craft and send raw packets.
--   **Tor Service:** To use the anonymity feature, the Tor service must be installed and running.
+-   **Tor Service (Optional):** To use the anonymity feature, the Tor service must be installed and running.
 
 **Installation Steps:**
 
-1.  **Install the Tor Service:**
-    *   **On macOS (via Homebrew):**
-        ```bash
-        brew install tor
-        brew services start tor
-        ```
-    *   **On Debian/Ubuntu:**
-        ```bash
-        sudo apt update && sudo apt install tor
-        sudo systemctl start tor
-        ```
+1.  **Install the Tor Service (Optional):**
+    *   **On macOS (via Homebrew):** `brew install tor && brew services start tor`
+    *   **On Debian/Ubuntu:** `sudo apt update && sudo apt install tor && sudo systemctl start tor`
 
 2.  **Clone the project repository and set up the environment:**
     ```bash
@@ -74,25 +58,25 @@ The script must be run with `sudo` (on Linux/macOS) or as an Administrator (on W
 1.  **Activate your virtual environment:** `source .venv/bin/activate`
 2.  **Run the main script:** `sudo python3 main.py`
 
-The script will guide you through selecting a target, enabling Tor, and choosing an attack profile.
+The script will automatically detect your network interface and then guide you through selecting a target, enabling Tor, and choosing an attack profile.
 
 ## 🛡️ Attack Profiles Explained
 
-The toolkit offers three distinct strategic profiles, each combining different attack vectors.
+The toolkit offers three distinct strategic profiles, each combining different attack vectors with carefully tuned thread counts for optimal performance.
 
 ### 1. Full Scale Counterstrike (The Siege)
 
-This profile is a comprehensive, "kitchen sink" assault designed for maximum pressure across the entire technology stack. It is a long-running siege meant to test long-term resilience.
+This profile is a comprehensive, "kitchen sink" assault designed for maximum sustained pressure across the entire technology stack. It is a long-running siege meant to test long-term resilience. **Warning: This profile is extremely resource-intensive on the attacking machine.**
 
--   **Strategy:** Overwhelm everything at once.
--   **Includes:** `UDP Flood`, `SYN Flood`, `ICMP Flood`, `TCP Fragmentation`, `DNS Query Flood`, **`Cache-Busting GET Flood`**, `HTTP POST Flood`, `Slowloris`, and `HTTP/2 Rapid Reset`.
+-   **Strategy:** Overwhelm everything at once with a massive, but sustainable, number of concurrent threads.
+-   **Includes:** All 10+ attack vectors, including DNS Amplification, TCP Fragmentation, Slowloris, and H2 Rapid Reset.
 
 ### 2. Fast Counterstrike (The Surgical Strike)
 
-This profile is a short, intense burst designed for maximum impact in minimum time. It prioritizes the most efficient and modern attack vectors.
+This profile is a short, intense burst designed for maximum impact in minimum time. It prioritizes the most efficient and modern attack vectors with an optimized thread count for high-impact, burst performance.
 
 -   **Strategy:** Cripple the target's services quickly and effectively.
--   **Includes:** `DNS Query Flood`, `SYN Flood`, `HTTP POST Flood`, and `HTTP/2 Rapid Reset`.
+-   **Includes:** DNS Query Flood, SYN Flood, HTTP POST Flood, and HTTP/2 Rapid Reset.
 
 ### 3. Adaptive Counterstrike (The Smart Strike)
 
