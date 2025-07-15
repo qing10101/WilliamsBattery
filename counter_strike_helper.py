@@ -13,7 +13,7 @@ from scapy.volatile import RandString
 import h2.connection
 import h2.events
 import socks
-import netifaces # NEW: Import the netifaces library
+import netifaces  # NEW: Import the netifaces library
 
 # ==============================================================================
 # WARNING: This is a Denial of Service (DoS) script for educational purposes.
@@ -30,8 +30,67 @@ USER_AGENTS = [
     "Mozilla/5.0 (Linux; Android 12; SM-S908U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36",
 ]
 
+open_ports = []
+ports_lock = threading.Lock()
+
 
 # --- 1. UTILITY AND SHARED WORKER FUNCTIONS ---
+# A thread-safe list to store the results of the scan
+def port_scan_worker(target_ip, port_queue):
+    """Worker that takes port numbers from a queue and checks if they are open."""
+    while not port_queue.empty():
+        try:
+            port = port_queue.get()
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)  # Use a short timeout for speed
+                # If the connection succeeds, the port is open
+                if s.connect_ex((target_ip, port)) == 0:
+                    with ports_lock:
+                        open_ports.append(port)
+            port_queue.task_done()
+        except Exception:
+            # Silently handle any errors
+            port_queue.task_done()
+            continue
+
+
+def run_port_scan(target_url, ports_to_scan, threads=100):
+    """
+    Manages a multi-threaded TCP port scan to find open ports.
+
+    :param target_url: The domain name of the target.
+    :param ports_to_scan: A list or range of ports to check.
+    :param threads: Number of concurrent scanning threads.
+    :return: A sorted list of open ports.
+    """
+    ips = resolve_to_ipv4(target_url)
+    if not ips:
+        print(f"[RECON] Could not resolve {target_url}. Aborting scan.")
+        return []
+
+    target_ip = ips[0]
+    print(f"[RECON] Starting TCP port scan on {target_ip}...")
+
+    # Clear previous results and set up the job queue
+    global open_ports
+    open_ports = []
+    port_queue = Queue()
+    for port in ports_to_scan:
+        port_queue.put(port)
+
+    # Start the worker threads
+    for _ in range(threads):
+        t = threading.Thread(target=port_scan_worker, args=(target_ip, port_queue))
+        t.daemon = True
+        t.start()
+
+    # Wait for all jobs in the queue to be completed
+    port_queue.join()
+
+    print(f"[RECON] Scan complete. Found {len(open_ports)} open TCP ports.")
+    return sorted(open_ports)
+
+
 def resolve_to_ipv4(target_url):
     """Resolves a hostname to a list of its IPv4 addresses."""
     try:
