@@ -14,6 +14,8 @@ import h2.connection
 import h2.events
 import socks
 import netifaces  # NEW: Import the netifaces library
+from queue import Queue # NEW: Import Queue for thread-safe job management
+
 
 # ==============================================================================
 # WARNING: This is a Denial of Service (DoS) script for educational purposes.
