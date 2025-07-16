@@ -17,22 +17,15 @@ William's Battery is a powerful, multi-threaded Python-based toolkit for demonst
 ## 🚀 Features
 
 -   **Blended, Multi-Threaded Attacks:** Launches multiple attack vectors simultaneously to create a complex and effective attack simulation.
--   **Adaptive Attack Controller:** An intelligent mode that monitors the target's status, automatically pausing the attack when the target is down and resuming it upon recovery to maximize efficiency.
--   **Anonymity via Tor:** Integrates with the Tor network to route application-layer attacks (HTTP, Slowloris, WebSockets) through a SOCKS proxy, masking the operator's real IP address for those vectors.
+-   **Intelligent & Adaptive Modes:**
+    -   **Adaptive Controller:** Monitors the target's status, automatically pausing the attack when the target is down and resuming it upon recovery to maximize efficiency.
+    -   **Recon-led Strikes:** Can perform a pre-attack port scan and then launch a surgical assault targeting only the discovered open services.
+    -   **Origin IP Discovery:** Includes tools to find a server's real IP address behind common proxy services by scanning MX records and subdomains.
+-   **Anonymity via Tor:** Integrates with the Tor network to route application-layer attacks through a SOCKS proxy, masking the operator's real IP address for those vectors.
 -   **Auto-Detect Network Interface:** Automatically identifies the correct network interface for Scapy-based attacks, preventing silent failures in complex network environments.
 -   **Comprehensive Attack Vectors:**
-    -   **Layer 7 (Application):**
-        -   **HTTP/2 Rapid Reset:** A highly efficient attack exploiting the H2 protocol to cause maximum CPU load with minimal bandwidth.
-        -   **HTTP POST Flood:** Bypasses caches by sending randomized POST data, forcing expensive server-side processing and database load.
-        -   **Cache-Busting GET Flood:** Defeats CDNs and caching layers by sending GET requests with randomized query parameters.
-        -   **WebSocket Flood:** A state-exhaustion attack that targets modern, real-time applications by holding open thousands of persistent connections.
-        -   **Slowloris:** A stealthy "low and slow" attack that exhausts the server's connection pool with minimal traffic.
-        -   **DNS Query Flood:** A smart attack that floods the target with valid but randomized DNS queries, overwhelming the DNS resolver application.
-    -   **Layer 3/4 (Network & Transport):**
-        -   **TCP SYN, ACK, and XMAS Floods:** A suite of TCP attacks to exhaust connection tables and stress the processing logic of stateful firewalls.
-        -   **TCP Fragmentation Attack:** A memory exhaustion attack that targets firewalls and OS network stacks by sending incomplete packet fragments.
-        -   **UDP & ICMP Floods:** Classic volumetric attacks to saturate network bandwidth.
--   **Configurable Attack Profiles:** Choose from pre-configured strategies that are optimized for different testing scenarios and resource levels.
+    -   **Layer 7 (Application):** HTTP/2 Rapid Reset, HTTP POST Flood, Cache-Busting GET Flood, WebSocket Flood, Slowloris, DNS Query Flood.
+    -   **Layer 3/4 (Network & Transport):** TCP SYN, ACK, & XMAS Floods, TCP Fragmentation Attack, UDP & ICMP Floods.
 
 ## ⚙️ Prerequisites & Installation
 
@@ -67,7 +60,7 @@ The script must be run with `sudo` (on Linux/macOS) or as an Administrator (on W
 1.  **Activate your virtual environment:** `source .venv/bin/activate`
 2.  **Run the main script:** `sudo python3 main.py`
 
-The script will automatically detect your network interface and then guide you through selecting a target, enabling Tor, and choosing an attack profile.
+The script will guide you through selecting a target and an action, such as launching an attack profile or running reconnaissance.
 
 ## 🛡️ Attack Profiles Explained
 
@@ -104,6 +97,7 @@ scapy
 h2
 pysocks
 netifaces
+dnspython
 websockets
 ```
 *(Note: Use `pip freeze > requirements.txt` to generate a file with pinned versions for reproducible builds.)*
