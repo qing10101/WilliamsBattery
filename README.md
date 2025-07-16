@@ -18,12 +18,21 @@ William's Battery is a powerful, multi-threaded Python-based toolkit for demonst
 
 -   **Blended, Multi-Threaded Attacks:** Launches multiple attack vectors simultaneously to create a complex and effective attack simulation.
 -   **Adaptive Attack Controller:** An intelligent mode that monitors the target's status, automatically pausing the attack when the target is down and resuming it upon recovery to maximize efficiency.
--   **Anonymity via Tor:** Integrates with the Tor network to route application-layer attacks through a SOCKS proxy, masking the operator's real IP address for those vectors.
+-   **Anonymity via Tor:** Integrates with the Tor network to route application-layer attacks (HTTP, Slowloris, WebSockets) through a SOCKS proxy, masking the operator's real IP address for those vectors.
 -   **Auto-Detect Network Interface:** Automatically identifies the correct network interface for Scapy-based attacks, preventing silent failures in complex network environments.
 -   **Comprehensive Attack Vectors:**
-    -   **Layer 7 (Application):** HTTP/2 Rapid Reset, HTTP POST Flood, Cache-Busting GET Flood, Slowloris, DNS Query Flood.
-    -   **Layer 3/4 (Network & Transport):** TCP SYN Flood, TCP ACK Flood, TCP Fragmentation Attack, UDP Flood, and ICMP Flood.
--   **Tuned Attack Profiles:** Choose from pre-configured strategies that are optimized for different testing scenarios and resource levels.
+    -   **Layer 7 (Application):**
+        -   **HTTP/2 Rapid Reset:** A highly efficient attack exploiting the H2 protocol to cause maximum CPU load with minimal bandwidth.
+        -   **HTTP POST Flood:** Bypasses caches by sending randomized POST data, forcing expensive server-side processing and database load.
+        -   **Cache-Busting GET Flood:** Defeats CDNs and caching layers by sending GET requests with randomized query parameters.
+        -   **WebSocket Flood:** A state-exhaustion attack that targets modern, real-time applications by holding open thousands of persistent connections.
+        -   **Slowloris:** A stealthy "low and slow" attack that exhausts the server's connection pool with minimal traffic.
+        -   **DNS Query Flood:** A smart attack that floods the target with valid but randomized DNS queries, overwhelming the DNS resolver application.
+    -   **Layer 3/4 (Network & Transport):**
+        -   **TCP SYN, ACK, and XMAS Floods:** A suite of TCP attacks to exhaust connection tables and stress the processing logic of stateful firewalls.
+        -   **TCP Fragmentation Attack:** A memory exhaustion attack that targets firewalls and OS network stacks by sending incomplete packet fragments.
+        -   **UDP & ICMP Floods:** Classic volumetric attacks to saturate network bandwidth.
+-   **Configurable Attack Profiles:** Choose from pre-configured strategies that are optimized for different testing scenarios and resource levels.
 
 ## ⚙️ Prerequisites & Installation
 
@@ -62,28 +71,30 @@ The script will automatically detect your network interface and then guide you t
 
 ## 🛡️ Attack Profiles Explained
 
-The toolkit offers three distinct strategic profiles, each combining different attack vectors with carefully tuned thread counts for optimal performance.
+The toolkit offers several distinct strategic profiles, each combining different attack vectors with carefully tuned thread counts for optimal performance.
 
 ### 1. Full Scale Counterstrike (The Siege)
 
-This profile is a comprehensive, "kitchen sink" assault designed for maximum sustained pressure across the entire technology stack. It is a long-running siege meant to test long-term resilience. **Warning: This profile is extremely resource-intensive on the attacking machine.**
+This profile is a comprehensive, "kitchen sink" assault designed for maximum pressure across the entire technology stack. It is a long-running siege meant to test long-term resilience. **Warning: This profile is extremely resource-intensive on the attacking machine.**
 
 -   **Strategy:** Overwhelm everything at once with a massive, but sustainable, number of concurrent threads.
--   **Includes:** All 10+ attack vectors, including DNS Amplification, TCP Fragmentation, Slowloris, and H2 Rapid Reset.
+-   **Includes:** Nearly all implemented attack vectors, from L3 volumetric floods to sophisticated L7 application-layer assaults.
 
 ### 2. Fast Counterstrike (The Surgical Strike)
 
-This profile is a short, intense burst designed for maximum impact in minimum time. It prioritizes the most efficient and modern attack vectors with an optimized thread count for high-impact, burst performance.
+This profile is a short, intense burst designed for maximum impact in minimum time. It prioritizes the most efficient and modern attack vectors.
 
 -   **Strategy:** Cripple the target's services quickly and effectively.
--   **Includes:** DNS Query Flood, SYN Flood, HTTP POST Flood, and HTTP/2 Rapid Reset.
+-   **Includes:** `DNS Query Flood`, `SYN Flood`, `HTTP POST Flood`, and `HTTP/2 Rapid Reset`.
 
-### 3. Adaptive Counterstrike (The Smart Strike)
+### 3. Level 2 Penetrator (The Hardened Target Assault)
 
-This profile uses the potent "Fast Scale" vector set but adds an intelligent controller. It's designed for efficient, long-running tests where attacker resources are a consideration.
+A specially designed profile to overwhelm servers with intermediate defenses like basic rate-limiting. It focuses on high-intensity L7 attacks and spoofed L4 floods.
 
--   **Strategy:** Apply pressure only when the target is online, conserving resources when it's down.
--   **Includes:** The same powerful vector set as the Fast Counterstrike, managed by the adaptive controller.
+-   **Strategy:** Bypass common, simple defenses with more sophisticated techniques.
+-   **Includes:** `H2 Rapid Reset`, `Tor-routed POST and Slowloris floods`, and spoofed `SYN` and `TCP Fragmentation` attacks.
+
+*(Note: Other profiles like Adaptive Strike and Recon-led Strike are also available.)*
 
 ## 📄 `requirements.txt`
 
@@ -93,6 +104,7 @@ scapy
 h2
 pysocks
 netifaces
+websockets
 ```
 *(Note: Use `pip freeze > requirements.txt` to generate a file with pinned versions for reproducible builds.)*
 
