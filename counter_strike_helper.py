@@ -755,6 +755,7 @@ def xmas_worker(stop_event, pause_event, target_ip, port, iface):
         except Exception:
             pass
 
+
 def attack_xmas_flood(target_url, port, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for TCP XMAS flood attacks."""
     ips = resolve_to_ipv4(target_url)
