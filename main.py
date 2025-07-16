@@ -36,7 +36,8 @@ def level2_penetrator_strike(target, use_proxy, network_interface):
         "duration": 180,  # A medium duration of 3 minutes
     }
     print(
-        f"[CONFIG] Using {params['threads']} flood threads, {params['h2_threads']} H2 connections, and {params['slowloris_sockets']} Slowloris sockets.")
+        f"[CONFIG] Using {params['threads']} flood threads, {params['h2_threads']} H2 connections,"
+        f" and {params['slowloris_sockets']} Slowloris sockets.")
 
     # --- VECTOR 1: L7 Application Overwhelm ---
     # These attacks target the CPU and application logic, which fail2ban is too slow to stop.
