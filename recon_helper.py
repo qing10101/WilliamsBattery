@@ -6,13 +6,6 @@ from queue import Queue
 import dns.resolver
 import counter_strike_helper  # We still need this for the IP resolution helper
 
-# --- A list of common subdomains to check ---
-COMMON_SUBDOMAINS = [
-    "mail", "webmail", "ftp", "cpanel", "direct", "dev", "staging", "test", "vpn",
-    "blog", "m", "shop", "api", "dns", "email", "mail2", "owa", "portal", "admin",
-    "autodiscover", "support", "files", "images", "static", "www", "smtp", "pop"
-]
-
 # --- 1. PORT SCANNING MODULE ---
 
 # Thread-safe list to store the results of the scan
@@ -87,8 +80,25 @@ def find_origin_ip_by_mx(target_domain):
     return potential_ips
 
 
+def load_subdomains(filename="subdomains.txt"):
+    """Loads a list of subdomains from a wordlist file."""
+    try:
+        with open(filename, 'r') as f:
+            subdomains = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+        if not subdomains:
+            print(f"[ERROR] Subdomain wordlist '{filename}' is empty or not found.")
+            return []
+        print(f"[INFO] Loaded {len(subdomains)} subdomains from wordlist.")
+        return subdomains
+    except FileNotFoundError:
+        print(f"[ERROR] Subdomain wordlist not found: {filename}")
+        print("[HINT]  Download a wordlist and save it as 'subdomains.txt' in your project directory.")
+        return []
+
+
 def subdomain_scan_worker(target_domain, subdomain_queue, found_ips_set, lock):
     """Worker thread that checks a single subdomain for its IP address."""
+    # This worker function is already perfect and needs no changes.
     while not subdomain_queue.empty():
         subdomain = subdomain_queue.get()
         full_domain = f"{subdomain}.{target_domain}"
@@ -105,18 +115,32 @@ def subdomain_scan_worker(target_domain, subdomain_queue, found_ips_set, lock):
             subdomain_queue.task_done()
 
 
+# --- THIS IS THE UPDATED FUNCTION ---
 def find_origin_ip_by_subdomains(target_domain, threads=50):
-    """Performs a multi-threaded subdomain scan to find non-proxied servers."""
-    print(f"[RECON] Scanning for common subdomains on {target_domain}...")
+    """
+    Performs a multi-threaded subdomain scan using a wordlist file
+    to find non-proxied servers.
+    """
+    print(f"[RECON] Preparing to scan for subdomains on {target_domain} using wordlist...")
+
+    # Load subdomains from the file instead of a hardcoded list
+    subdomains_to_check = load_subdomains("subdomains.txt")
+    if not subdomains_to_check:
+        return set()  # Return an empty set if the wordlist couldn't be loaded
+
     found_ips = set()
     lock = threading.Lock()
     subdomain_queue = Queue()
 
-    for sub in COMMON_SUBDOMAINS:
+    for sub in subdomains_to_check:
         subdomain_queue.put(sub)
 
+    print(f"[RECON] Starting scan with {threads} threads...")
     for _ in range(threads):
-        t = threading.Thread(target=subdomain_scan_worker, args=(target_domain, subdomain_queue, found_ips, lock))
+        t = threading.Thread(
+            target=subdomain_scan_worker,
+            args=(target_domain, subdomain_queue, found_ips, lock)
+        )
         t.daemon = True
         t.start()
 
