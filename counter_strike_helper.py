@@ -16,7 +16,7 @@ import socks
 import netifaces  # NEW: Import the netifaces library
 from queue import Queue  # NEW: Import Queue for thread-safe job management
 import asyncio  # NEW: Import for asynchronous operations
-import websockets # NEW: Import the websockets library
+import websockets  # NEW: Import the websockets library
 import ipaddress
 
 

@@ -4,7 +4,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Educational Use](https://img.shields.io/badge/purpose-educational-lightgrey.svg)
 
-William's Battery is a powerful, multi-threaded Python-based toolkit for demonstrating and researching a wide array of Denial of Service (DoS) attack vectors. It launches sophisticated, blended attacks to simulate complex cyber-attack scenarios for security testing and network infrastructure stress-testing.
+William's Battery is a powerful, multi-threaded Python-based toolkit for demonstrating and researching a wide array of Denial of Service (DoS) attack vectors. It launches sophisticated, blended attacks and offers a suite of reconnaissance tools to simulate a complete cyber-attack scenario for security testing and network infrastructure stress-testing.
 
 ## ⚠️ Legal & Ethical Disclaimer
 
@@ -16,16 +16,21 @@ William's Battery is a powerful, multi-threaded Python-based toolkit for demonst
 
 ## 🚀 Features
 
--   **Blended, Multi-Threaded Attacks:** Launches multiple attack vectors simultaneously to create a complex and effective attack simulation.
--   **Intelligent & Adaptive Modes:**
-    -   **Adaptive Controller:** Monitors the target's status, automatically pausing the attack when the target is down and resuming it upon recovery to maximize efficiency.
-    -   **Recon-led Strikes:** Can perform a pre-attack port scan and then launch a surgical assault targeting only the discovered open services.
-    -   **Origin IP Discovery:** Includes tools to find a server's real IP address behind common proxy services by scanning MX records and subdomains.
--   **Anonymity via Tor:** Integrates with the Tor network to route application-layer attacks through a SOCKS proxy, masking the operator's real IP address for those vectors.
--   **Auto-Detect Network Interface:** Automatically identifies the correct network interface for Scapy-based attacks, preventing silent failures in complex network environments.
--   **Comprehensive Attack Vectors:**
-    -   **Layer 7 (Application):** HTTP/2 Rapid Reset, HTTP POST Flood, Cache-Busting GET Flood, WebSocket Flood, Slowloris, DNS Query Flood.
-    -   **Layer 3/4 (Network & Transport):** TCP SYN, ACK, & XMAS Floods, TCP Fragmentation Attack, UDP & ICMP Floods.
+-   **Modular Architecture:** The tool is cleanly separated into attack (`counter_strike_helper.py`), reconnaissance (`recon_helper.py`), and control (`main.py`) modules for easy maintenance and extension.
+-   **Blended, Multi-Threaded Attacks:** Launches multiple attack vectors simultaneously in pre-configured profiles (Siege, Surgical Strike, etc.).
+-   **Advanced Intelligence & Reconnaissance:**
+    -   **Origin IP Discovery:** Includes tools to find a server's real IP address behind common proxies by scanning MX records, SPF records, and a massive list of potential subdomains.
+    -   **ASN & WHOIS Lookups:** Automatically enriches discovered IPs with network owner information to provide crucial context.
+    -   **Port Scanning:** Can perform a pre-attack port scan to identify open services for more efficient, targeted attacks.
+-   **Sophisticated Attack Vectors:**
+    -   **Layer 7 (Application):**
+        -   **Targeted "Heavy" POST Flood:** A surgical attack that allows the user to target a specific, computationally expensive endpoint (like a search API) with custom POST data.
+        -   **HTTP/2 Rapid Reset:** A highly efficient attack exploiting the H2 protocol to cause maximum CPU load.
+        -   **WebSocket Flood:** A state-exhaustion attack targeting modern real-time applications.
+        -   And many more, including Slowloris, Cache-Busting GETs, and DNS Query Floods.
+    -   **Layer 3/4 (Network & Transport):**
+        -   A full suite of classic floods, including TCP SYN, ACK, XMAS, and Fragmentation attacks, plus UDP and ICMP floods.
+-   **Anonymity & Evasion:** Integrates with the Tor network to route application-layer attacks through a SOCKS proxy, masking the operator's IP and bypassing simple blocks.
 
 ## ⚙️ Prerequisites & Installation
 
@@ -60,34 +65,7 @@ The script must be run with `sudo` (on Linux/macOS) or as an Administrator (on W
 1.  **Activate your virtual environment:** `source .venv/bin/activate`
 2.  **Run the main script:** `sudo python3 main.py`
 
-The script will guide you through selecting a target and an action, such as launching an attack profile or running reconnaissance.
-
-## 🛡️ Attack Profiles Explained
-
-The toolkit offers several distinct strategic profiles, each combining different attack vectors with carefully tuned thread counts for optimal performance.
-
-### 1. Full Scale Counterstrike (The Siege)
-
-This profile is a comprehensive, "kitchen sink" assault designed for maximum pressure across the entire technology stack. It is a long-running siege meant to test long-term resilience. **Warning: This profile is extremely resource-intensive on the attacking machine.**
-
--   **Strategy:** Overwhelm everything at once with a massive, but sustainable, number of concurrent threads.
--   **Includes:** Nearly all implemented attack vectors, from L3 volumetric floods to sophisticated L7 application-layer assaults.
-
-### 2. Fast Counterstrike (The Surgical Strike)
-
-This profile is a short, intense burst designed for maximum impact in minimum time. It prioritizes the most efficient and modern attack vectors.
-
--   **Strategy:** Cripple the target's services quickly and effectively.
--   **Includes:** `DNS Query Flood`, `SYN Flood`, `HTTP POST Flood`, and `HTTP/2 Rapid Reset`.
-
-### 3. Level 2 Penetrator (The Hardened Target Assault)
-
-A specially designed profile to overwhelm servers with intermediate defenses like basic rate-limiting. It focuses on high-intensity L7 attacks and spoofed L4 floods.
-
--   **Strategy:** Bypass common, simple defenses with more sophisticated techniques.
--   **Includes:** `H2 Rapid Reset`, `Tor-routed POST and Slowloris floods`, and spoofed `SYN` and `TCP Fragmentation` attacks.
-
-*(Note: Other profiles like Adaptive Strike and Recon-led Strike are also available.)*
+The script will then present a top-level menu allowing you to choose between launching a blended attack profile, running reconnaissance, or launching a targeted L7 attack.
 
 ## 📄 `requirements.txt`
 
@@ -99,6 +77,7 @@ pysocks
 netifaces
 dnspython
 websockets
+ipwhois
 ```
 *(Note: Use `pip freeze > requirements.txt` to generate a file with pinned versions for reproducible builds.)*
 

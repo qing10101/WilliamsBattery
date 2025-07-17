@@ -1,6 +1,6 @@
 # recon_helper.py - Reconnaissance and Discovery Toolkit
 
-from ipwhois import IPWhois # NEW: Import the ipwhois library
+from ipwhois import IPWhois  # NEW: Import the ipwhois library
 import re # NEW: Import the regular expression module
 import socket
 import threading
