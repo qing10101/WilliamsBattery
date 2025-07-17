@@ -20,7 +20,7 @@ William's Battery is a powerful, multi-threaded Python-based toolkit for demonst
 -   **Blended, Multi-Threaded Attacks:** Launches multiple attack vectors simultaneously in pre-configured profiles (Siege, Surgical Strike, etc.).
 -   **Advanced Intelligence & Reconnaissance:**
     -   **Origin IP Discovery:** Includes tools to find a server's real IP address behind common proxies by scanning MX records, SPF records, and a massive list of potential subdomains.
-    -   **ASN & WHOIS Lookups:** Automatically enriches discovered IPs with network owner information to provide crucial context.
+    -   **ASN Lookups:** Automatically enriches discovered IPs with network owner information to provide crucial context.
     -   **Port Scanning:** Can perform a pre-attack port scan to identify open services for more efficient, targeted attacks.
 -   **Sophisticated Attack Vectors:**
     -   **Layer 7 (Application):**
