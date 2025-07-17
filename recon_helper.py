@@ -1,6 +1,6 @@
 # recon_helper.py - Reconnaissance and Discovery Toolkit
 
-import whois # NEW: Import the python-whois library
+from ipwhois import IPWhois # NEW: Import the ipwhois library
 import re # NEW: Import the regular expression module
 import socket
 import threading
@@ -207,27 +207,27 @@ def find_origin_ip_by_spf(target_domain):
     return final_ips
 
 
-# --- NEW: AUTOMATED WHOIS LOOKUP MODULE ---
-def get_ip_ownership(ip_address):
+# --- NEW: ASN (NETWORK OWNER) LOOKUP MODULE ---
+def get_ip_asn(ip_address):
     """
-    Performs a WHOIS lookup on an IP address to find its owner organization.
+    Performs a lookup to find the ASN (Autonomous System Number) and
+    description for an IP address. This reveals the owner of the network block.
 
     :param ip_address: The IP address string to look up.
-    :return: The organization name as a string, or "N/A" if not found or on error.
+    :return: A formatted string like "AS15169 - GOOGLE", or "N/A".
     """
     try:
-        w = whois.whois(ip_address)
-        # WHOIS records can be messy. We'll try to find common organization fields.
-        # The 'org' field is most common.
-        if w and w.org:
-            # Sometimes the org name is a list, so we join it.
-            return ' '.join(w.org) if isinstance(w.org, list) else w.org
-        # If 'org' isn't there, 'name' is another common field.
-        elif w and w.name:
-            return w.name
-        else:
-            return "Unknown"
+        # Create an IPWhois object for the target IP
+        obj = IPWhois(ip_address)
+        # Perform the lookup. lookup_rdap() is modern and recommended.
+        results = obj.lookup_rdap()
+
+        # Extract the ASN and its description
+        asn = results.get('asn', 'N/A')
+        description = results.get('asn_description', 'Unknown')
+
+        return f"AS{asn} - {description}"
 
     except Exception:
-        # If the WHOIS lookup fails for any reason, return N/A gracefully.
-        return "WHOIS Lookup Failed"
+        # If the lookup fails for any reason, return gracefully.
+        return "ASN Lookup Failed"

@@ -333,10 +333,10 @@ def adaptive_strike(target, use_proxy, network_interface):
 def run_origin_discovery(target):
     """
     Runs various reconnaissance techniques to find the real IP behind a proxy
-    and automatically identifies the owner of each discovered IP.
+    and automatically identifies the network owner (ASN) of each discovered IP.
     """
     print("\n" + "=" * 60)
-    print("MODE: ORIGIN IP DISCOVERY (with WHOIS Analysis)")
+    print("MODE: ORIGIN IP DISCOVERY (with ASN Analysis)")
     print("This will attempt to find the real server IP behind services like Cloudflare.")
     print("=" * 60)
 
@@ -345,11 +345,13 @@ def run_origin_discovery(target):
         if not proxied_ips:
             print(f"[ERROR] Could not resolve the primary domain: {target}")
             return
+
         print(f"[*] Current proxied IPs for {target}:")
         for ip in proxied_ips:
-            # Perform WHOIS on the known proxy IPs too, for context
-            owner = recon_helper.get_ip_ownership(ip)
-            print(f"  -> {ip:<15} (Owner: {owner})")
+            # Perform ASN lookup on the known proxy IPs for context
+            owner = recon_helper.get_ip_asn(ip)
+            print(f"  -> {ip:<15} (Network: {owner})")
+            time.sleep(0.1)
 
     except Exception as e:
         print(f"[ERROR] An error occurred during initial resolution: {e}")
@@ -367,14 +369,15 @@ def run_origin_discovery(target):
     if origin_candidates:
         print("[SUCCESS] Found potential origin IP(s) that are NOT behind the proxy:")
 
-        # --- NEW: Display results in a formatted table with WHOIS info ---
-        print(f"{'IP Address':<18} | {'Owner / Organization'}")
-        print("-" * 50)
+        # --- NEW: Display results in a formatted table with ASN info ---
+        print(f"{'IP Address':<18} | {'Network Owner (ASN)'}")
+        print("-" * 70)
 
         for ip in sorted(list(origin_candidates)):
-            # For each potential origin IP, get its owner
-            owner = recon_helper.get_ip_ownership(ip).replace('\n', ' ')  # Clean up newlines
+            # For each potential origin IP, get its network owner
+            owner = recon_helper.get_ip_asn(ip)
             print(f"{ip:<18} | {owner}")
+            time.sleep(0.1)
 
         print("\nUse one of these IPs as your target for a direct attack.")
     else:
