@@ -329,7 +329,7 @@ def adaptive_strike(target, use_proxy, network_interface):
         time.sleep(2)
 
 
-# --- NEW: ORIGIN DISCOVERY ORCHESTRATOR (Now calls the recon_helper) ---
+# --- UPDATED ORIGIN DISCOVERY ORCHESTRATOR ---
 def run_origin_discovery(target):
     """
     Runs various reconnaissance techniques to find the real IP behind a proxy.
@@ -349,11 +349,19 @@ def run_origin_discovery(target):
         print(f"[ERROR] An error occurred during initial resolution: {e}")
         return
 
-    # Call the functions from the new module
+    # Run the MX record check
     mx_ips = recon_helper.find_origin_ip_by_mx(target)
+
+    # Run the subdomain scan
     subdomain_ips = recon_helper.find_origin_ip_by_subdomains(target)
 
-    all_potential_ips = mx_ips.union(subdomain_ips)
+    # --- NEW: Run the SPF record analysis ---
+    spf_ips = recon_helper.find_origin_ip_by_spf(target)
+
+    # Combine all found IPs
+    all_potential_ips = mx_ips.union(subdomain_ips).union(spf_ips)
+
+    # Filter out the known proxy IPs
     origin_candidates = all_potential_ips - proxied_ips
 
     print("\n--- DISCOVERY COMPLETE ---")

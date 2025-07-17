@@ -1,5 +1,6 @@
 # recon_helper.py - Reconnaissance and Discovery Toolkit
 
+import re # NEW: Import the regular expression module
 import socket
 import threading
 from queue import Queue
@@ -146,3 +147,60 @@ def find_origin_ip_by_subdomains(target_domain, threads=50):
 
     subdomain_queue.join()
     return found_ips
+
+
+# --- NEW: SPF RECORD ANALYSIS MODULE ---
+
+def _parse_spf_record(domain, found_ips_set, recursion_depth=0):
+    """
+    A recursive helper function to parse an SPF record, following 'include'
+    directives and extracting IPv4 addresses.
+    """
+    # Protect against infinite recursion loops in misconfigured SPF records
+    if recursion_depth > 5:
+        return
+
+    try:
+        # Query for TXT records for the given domain
+        txt_records = dns.resolver.resolve(domain, 'TXT')
+
+        for record in txt_records:
+            record_str = record.strings[0].decode('utf-8')
+
+            # Check if this TXT record is actually an SPF record
+            if record_str.startswith("v=spf1"):
+                print(f"  [+] Found SPF record for {domain}: {record_str[:60]}...")
+
+                # Use regular expressions to find all ip4 addresses
+                ipv4s = re.findall(r'ip4:([0-9\./]+)', record_str)
+                for ip in ipv4s:
+                    found_ips_set.add(ip)  # Note: this might include CIDR ranges like /24
+
+                # Find all 'include' mechanisms and recursively parse them
+                includes = re.findall(r'include:(\S+)', record_str)
+                for included_domain in includes:
+                    _parse_spf_record(included_domain, found_ips_set, recursion_depth + 1)
+
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.Timeout):
+        # It's normal for sub-domains in the include chain not to have TXT records
+        pass
+    except Exception as e:
+        print(f"  [!] Error parsing SPF for {domain}: {e}")
+
+
+def find_origin_ip_by_spf(target_domain):
+    """
+    Finds potential origin IPs by recursively parsing a domain's SPF records.
+
+    :param target_domain: The domain to investigate.
+    :return: A set of potential IP addresses found.
+    """
+    print(f"[RECON] Analyzing SPF records for {target_domain}...")
+    found_ips = set()
+    _parse_spf_record(target_domain, found_ips)
+
+    # Clean up the results - some SPF records use CIDR notation (e.g., 1.2.3.0/24).
+    # For simplicity, we'll just take the base IP. A more advanced tool might expand the range.
+    final_ips = {ip.split('/')[0] for ip in found_ips}
+
+    return final_ips
