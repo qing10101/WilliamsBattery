@@ -332,10 +332,11 @@ def adaptive_strike(target, use_proxy, network_interface):
 # --- UPDATED ORIGIN DISCOVERY ORCHESTRATOR ---
 def run_origin_discovery(target):
     """
-    Runs various reconnaissance techniques to find the real IP behind a proxy.
+    Runs various reconnaissance techniques to find the real IP behind a proxy
+    and automatically identifies the owner of each discovered IP.
     """
     print("\n" + "=" * 60)
-    print("MODE: ORIGIN IP DISCOVERY")
+    print("MODE: ORIGIN IP DISCOVERY (with WHOIS Analysis)")
     print("This will attempt to find the real server IP behind services like Cloudflare.")
     print("=" * 60)
 
@@ -344,35 +345,40 @@ def run_origin_discovery(target):
         if not proxied_ips:
             print(f"[ERROR] Could not resolve the primary domain: {target}")
             return
-        print(f"[*] Current proxied IPs for {target}: {proxied_ips}")
+        print(f"[*] Current proxied IPs for {target}:")
+        for ip in proxied_ips:
+            # Perform WHOIS on the known proxy IPs too, for context
+            owner = recon_helper.get_ip_ownership(ip)
+            print(f"  -> {ip:<15} (Owner: {owner})")
+
     except Exception as e:
         print(f"[ERROR] An error occurred during initial resolution: {e}")
         return
 
-    # Run the MX record check
+    # Run all discovery methods
     mx_ips = recon_helper.find_origin_ip_by_mx(target)
-
-    # Run the subdomain scan
     subdomain_ips = recon_helper.find_origin_ip_by_subdomains(target)
-
-    # --- NEW: Run the SPF record analysis ---
     spf_ips = recon_helper.find_origin_ip_by_spf(target)
 
-    # Combine all found IPs
     all_potential_ips = mx_ips.union(subdomain_ips).union(spf_ips)
-
-    # Filter out the known proxy IPs
     origin_candidates = all_potential_ips - proxied_ips
 
     print("\n--- DISCOVERY COMPLETE ---")
     if origin_candidates:
         print("[SUCCESS] Found potential origin IP(s) that are NOT behind the proxy:")
+
+        # --- NEW: Display results in a formatted table with WHOIS info ---
+        print(f"{'IP Address':<18} | {'Owner / Organization'}")
+        print("-" * 50)
+
         for ip in sorted(list(origin_candidates)):
-            print(f"  -> {ip}")
+            # For each potential origin IP, get its owner
+            owner = recon_helper.get_ip_ownership(ip).replace('\n', ' ')  # Clean up newlines
+            print(f"{ip:<18} | {owner}")
+
         print("\nUse one of these IPs as your target for a direct attack.")
     else:
         print("[INFO] No non-proxied IP addresses were found with these methods.")
-        print("The server may be well-configured, or you can try a larger subdomain list.")
 
 
 # --- Main Execution Block with Auto-Detection ---

@@ -1,5 +1,6 @@
 # recon_helper.py - Reconnaissance and Discovery Toolkit
 
+import whois # NEW: Import the python-whois library
 import re # NEW: Import the regular expression module
 import socket
 import threading
@@ -204,3 +205,29 @@ def find_origin_ip_by_spf(target_domain):
     final_ips = {ip.split('/')[0] for ip in found_ips}
 
     return final_ips
+
+
+# --- NEW: AUTOMATED WHOIS LOOKUP MODULE ---
+def get_ip_ownership(ip_address):
+    """
+    Performs a WHOIS lookup on an IP address to find its owner organization.
+
+    :param ip_address: The IP address string to look up.
+    :return: The organization name as a string, or "N/A" if not found or on error.
+    """
+    try:
+        w = whois.whois(ip_address)
+        # WHOIS records can be messy. We'll try to find common organization fields.
+        # The 'org' field is most common.
+        if w and w.org:
+            # Sometimes the org name is a list, so we join it.
+            return ' '.join(w.org) if isinstance(w.org, list) else w.org
+        # If 'org' isn't there, 'name' is another common field.
+        elif w and w.name:
+            return w.name
+        else:
+            return "Unknown"
+
+    except Exception:
+        # If the WHOIS lookup fails for any reason, return N/A gracefully.
+        return "WHOIS Lookup Failed"
