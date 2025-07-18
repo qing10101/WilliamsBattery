@@ -380,19 +380,24 @@ def adaptive_strike(target, use_proxy, network_interface):
         time.sleep(2)
 
 
-# --- UPDATED ORIGIN DISCOVERY ORCHESTRATOR ---
-def run_origin_discovery(target):
+# --- NEW: "DEEP RECONNAISSANCE" ORCHESTRATOR ---
+# This function combines Origin Discovery, ASN Lookups, and Port Scanning
+# into a single, comprehensive intelligence-gathering operation.
+
+def run_deep_reconnaissance(target):
     """
-    Runs various reconnaissance techniques to find the real IP behind a proxy,
-    identifies the network owner (ASN), and saves the results to a file.
+    Runs a full reconnaissance suite: finds potential origin IPs, identifies
+    their network owners (ASN), and performs a port scan on each candidate,
+    presenting a final consolidated report.
     """
     print("\n" + "=" * 60)
-    print("MODE: ORIGIN IP DISCOVERY (with ASN Analysis)")
-    print("This will attempt to find the real server IP behind services like Cloudflare.")
+    print("MODE: DEEP RECONNAISSANCE")
+    print("This will discover potential origin IPs and then probe each one for open ports.")
     print("=" * 60)
 
+    # --- Phase 1: Origin IP Discovery ---
     try:
-        proxied_ips = set(counter_strike_helper.resolve_to_ipv4(target))
+        proxied_ips = set(counter_strike_helper.get_target_ips(target))
         if not proxied_ips:
             print(f"[ERROR] Could not resolve the primary domain: {target}")
             return
@@ -401,12 +406,10 @@ def run_origin_discovery(target):
         for ip in proxied_ips:
             owner = recon_helper.get_ip_asn(ip)
             print(f"  -> {ip:<15} (Network: {owner})")
-
     except Exception as e:
         print(f"[ERROR] An error occurred during initial resolution: {e}")
         return
 
-    # Run all discovery methods
     mx_ips = recon_helper.find_origin_ip_by_mx(target)
     subdomain_ips = recon_helper.find_origin_ip_by_subdomains(target)
     spf_ips = recon_helper.find_origin_ip_by_spf(target)
@@ -414,46 +417,73 @@ def run_origin_discovery(target):
     all_potential_ips = mx_ips.union(subdomain_ips).union(spf_ips)
     origin_candidates = all_potential_ips - proxied_ips
 
-    print("\n--- DISCOVERY COMPLETE ---")
-    if origin_candidates:
-        print("[SUCCESS] Found potential origin IP(s) that are NOT behind the proxy:")
+    if not origin_candidates:
+        print("\n[INFO] No non-proxied IP addresses were found with discovery methods.")
+        return
 
-        # --- Prepare data for display and file saving ---
-        results_to_save = []
+    print(f"\n[PHASE 1 COMPLETE] Found {len(origin_candidates)} potential origin IP(s) to investigate.")
 
-        # Print header for the console table
-        print(f"{'IP Address':<18} | {'Network Owner (ASN)'}")
-        print("-" * 70)
+    # --- Phase 2: Probing and Data Consolidation ---
+    print("\n[PHASE 2] Now performing ASN lookups and port scans on each candidate...")
 
-        for ip in sorted(list(origin_candidates)):
-            owner = recon_helper.get_ip_asn(ip)
-            # Add the result to our list for saving
-            results_to_save.append({'ip': ip, 'owner': owner})
-            # Print the result to the console
-            print(f"{ip:<18} | {owner}")
+    final_results = []
+    ports_to_scan = list(range(1, 1025))  # Scan the most common 1024 ports
+    ports_to_scan.extend([3306, 3389, 5432, 8000, 8080, 8443])
 
-        print("\nUse one of these IPs as your target for a direct attack.")
+    for ip in sorted(list(origin_candidates)):
+        print(f"\n--- Probing IP: {ip} ---")
 
-        # --- NEW: Save the results to a file ---
+        # Get ASN / Network Owner
+        owner = recon_helper.get_ip_asn(ip)
+        print(f"  [*] Network Owner: {owner}")
+
+        # Run Port Scan
+        # The run_port_scan function is smart enough to handle an IP directly
+        open_ports = recon_helper.run_port_scan(ip, ports_to_scan, threads=200)
+
+        # Store the consolidated result
+        final_results.append({
+            'ip': ip,
+            'owner': owner,
+            'open_ports': open_ports if open_ports else "None found"
+        })
+
+    # --- Phase 3: Final Report ---
+    print("\n" + "=" * 70)
+    print("DEEP RECONNAISSANCE FINAL REPORT")
+    print(f"Target Domain: {target}")
+    print("=" * 70)
+
+    if final_results:
+        # Display results in a clean, consolidated table
+        print(f"{'IP Address':<18} | {'Network Owner (ASN)':<40} | {'Open Ports'}")
+        print("-" * 100)
+
+        for result in final_results:
+            # Format open ports list for clean printing
+            ports_str = ', '.join(map(str, result['open_ports'])) if isinstance(result['open_ports'], list) else result[
+                'open_ports']
+            print(f"{result['ip']:<18} | {result['owner']:<40} | {ports_str}")
+
+        # --- Save the results to a file ---
         try:
-            # Create a unique filename with a timestamp
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            filename = f"recon_results_{target}_{timestamp}.txt"
-
+            filename = f"deep_recon_{target}_{timestamp}.txt"
             with open(filename, 'w') as f:
-                f.write(f"# Reconnaissance Results for: {target}\n")
-                f.write(f"# Scan completed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write("# --- Potential Origin IPs ---\n")
-                for result in results_to_save:
-                    f.write(f"{result['ip']}\n")  # Write just the IP for easy use in other tools
-
-            print(f"\n[SUCCESS] Results saved to: {filename}")
-
+                f.write(f"# Deep Reconnaissance Report for: {target}\n")
+                f.write(f"# Scan completed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                for result in final_results:
+                    ports_str = ', '.join(map(str, result['open_ports'])) if isinstance(result['open_ports'], list) else \
+                    result['open_ports']
+                    f.write(f"IP: {result['ip']}\n")
+                    f.write(f"  Network: {result['owner']}\n")
+                    f.write(f"  Open Ports: {ports_str}\n\n")
+            print(f"\n[SUCCESS] Full report saved to: {filename}")
         except Exception as e:
-            print(f"\n[ERROR] Could not save results to file: {e}")
-
+            print(f"\n[ERROR] Could not save report to file: {e}")
     else:
-        print("[INFO] No non-proxied IP addresses were found with these methods.")
+        # This case should be handled earlier, but is here as a fallback.
+        print("No final results to display.")
 
 
 # --- Main Execution Block with Auto-Detection ---
@@ -515,20 +545,7 @@ if __name__ == "__main__":
             else:
                 print("Invalid option selected. Exiting.")
         elif main_choice == 2:
-            recon_menu_text = """
-        Select a Reconnaissance Task:
-          1: Port Scan (Find open services)
-          2: Discover Origin IP (Bypass Proxy)
-
-        Please enter your option: """
-            recon_choice = int(input(recon_menu_text))
-            if recon_choice == 1:
-                # The recon-led strike starts with a port scan
-                reconnaissance_led_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
-            elif recon_choice == 2:
-                run_origin_discovery(target_domain)
-            else:
-                print("Invalid recon option.")
+            run_deep_reconnaissance(target_domain)
         elif main_choice == 3:
             run_heavy_post_strike(target_domain, proxy_enabled)
         else:
