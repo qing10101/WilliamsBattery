@@ -5,6 +5,7 @@ import time
 import socket
 import counter_strike_helper
 import recon_helper
+from datetime import datetime
 
 
 def launch_attack_thread(target_func, args_tuple):
@@ -382,8 +383,8 @@ def adaptive_strike(target, use_proxy, network_interface):
 # --- UPDATED ORIGIN DISCOVERY ORCHESTRATOR ---
 def run_origin_discovery(target):
     """
-    Runs various reconnaissance techniques to find the real IP behind a proxy
-    and automatically identifies the network owner (ASN) of each discovered IP.
+    Runs various reconnaissance techniques to find the real IP behind a proxy,
+    identifies the network owner (ASN), and saves the results to a file.
     """
     print("\n" + "=" * 60)
     print("MODE: ORIGIN IP DISCOVERY (with ASN Analysis)")
@@ -398,10 +399,8 @@ def run_origin_discovery(target):
 
         print(f"[*] Current proxied IPs for {target}:")
         for ip in proxied_ips:
-            # Perform ASN lookup on the known proxy IPs for context
             owner = recon_helper.get_ip_asn(ip)
             print(f"  -> {ip:<15} (Network: {owner})")
-            time.sleep(0.1)
 
     except Exception as e:
         print(f"[ERROR] An error occurred during initial resolution: {e}")
@@ -419,17 +418,40 @@ def run_origin_discovery(target):
     if origin_candidates:
         print("[SUCCESS] Found potential origin IP(s) that are NOT behind the proxy:")
 
-        # --- NEW: Display results in a formatted table with ASN info ---
+        # --- Prepare data for display and file saving ---
+        results_to_save = []
+
+        # Print header for the console table
         print(f"{'IP Address':<18} | {'Network Owner (ASN)'}")
         print("-" * 70)
 
         for ip in sorted(list(origin_candidates)):
-            # For each potential origin IP, get its network owner
             owner = recon_helper.get_ip_asn(ip)
+            # Add the result to our list for saving
+            results_to_save.append({'ip': ip, 'owner': owner})
+            # Print the result to the console
             print(f"{ip:<18} | {owner}")
-            time.sleep(0.1)
 
         print("\nUse one of these IPs as your target for a direct attack.")
+
+        # --- NEW: Save the results to a file ---
+        try:
+            # Create a unique filename with a timestamp
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            filename = f"recon_results_{target}_{timestamp}.txt"
+
+            with open(filename, 'w') as f:
+                f.write(f"# Reconnaissance Results for: {target}\n")
+                f.write(f"# Scan completed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write("# --- Potential Origin IPs ---\n")
+                for result in results_to_save:
+                    f.write(f"{result['ip']}\n")  # Write just the IP for easy use in other tools
+
+            print(f"\n[SUCCESS] Results saved to: {filename}")
+
+        except Exception as e:
+            print(f"\n[ERROR] Could not save results to file: {e}")
+
     else:
         print("[INFO] No non-proxied IP addresses were found with these methods.")
 
