@@ -16,37 +16,6 @@ def launch_attack_thread(target_func, args_tuple):
     return thread
 
 
-def stats_monitor(stop_event):
-    """
-    A thread that monitors and prints the attack statistics in real-time.
-    """
-    print("\n[STATS] Monitor started.")
-    last_check_time = time.time()
-    # Initialize last_packet_count by reading the current value
-    with counter_strike_helper.stats_lock:
-        last_packet_count = counter_strike_helper.attack_stats["packets_sent"]
-
-    while not stop_event.is_set():
-        time.sleep(1)  # Update every second
-
-        current_time = time.time()
-        with counter_strike_helper.stats_lock:
-            current_packet_count = counter_strike_helper.attack_stats["packets_sent"]
-
-        time_diff = current_time - last_check_time
-        packet_diff = current_packet_count - last_packet_count
-
-        pps = packet_diff / time_diff if time_diff > 0 else 0
-
-        sys.stdout.write(f"\r[STATS] Total Packets: {current_packet_count:,} | PPS: {pps:,.2f}    ")
-        sys.stdout.flush()
-
-        last_check_time = current_time
-        last_packet_count = current_packet_count
-
-    print("\n[STATS] Monitor stopped.")
-
-
 def operation_overwhelm(target, use_proxy, network_interface):
     """
     The ultimate blended attack profile designed to overwhelm a hardened, single-server
@@ -726,19 +695,7 @@ if __name__ == "__main__":
 
         # --- THIS IS THE CORE ORCHESTRATION LOGIC ---
         if profile_to_run:
-            # 1. Reset stats before starting
-            with counter_strike_helper.stats_lock:
-                counter_strike_helper.attack_stats["packets_sent"] = 0
 
-            # 2. Create a single stop_event for the whole session
-            main_stop_event = threading.Event()
-
-            # 3. Start the stats monitor in the background
-            monitor_thread = threading.Thread(target=stats_monitor, args=(main_stop_event,))
-            monitor_thread.daemon = True
-            monitor_thread.start()
-
-            # 4. Start the main attack profile in its own thread
             attack_thread = threading.Thread(
                 target=profile_to_run,
                 args=args_for_profile
@@ -752,11 +709,6 @@ if __name__ == "__main__":
             except KeyboardInterrupt:
                 print("\n[MAIN] Keyboard interrupt received. Stopping all processes...")
             finally:
-                # 6. Signal the monitor to stop and clean up
-                main_stop_event.set()
-                # Also signal the internal stop_event of the running attack, if it has one.
-                # This is a bit advanced but good practice. We can skip for now.
-                monitor_thread.join(timeout=2)  # Wait for the monitor to print its final message
                 print("\n[MAIN] Attack/Recon session finished.")
         else:
             print("Invalid option selected. Exiting.")

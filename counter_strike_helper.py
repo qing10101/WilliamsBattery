@@ -35,11 +35,7 @@ USER_AGENTS = [
     "Mozilla/5.0 (Linux; Android 12; SM-S908U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36",
 ]
 
-attack_stats = {"packets_sent": 0}
-stats_lock = threading.Lock()
 
-
-# --- 1. UTILITY AND SHARED WORKER FUNCTIONS ---
 # --- NEW: More Robust Tor Connection Checker ---
 def check_tor_connection():
     """
