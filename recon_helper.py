@@ -28,26 +28,97 @@ def port_scan_worker(target_ip, port_queue):
             port_queue.task_done()
             continue
 
-def run_port_scan(target_url, ports_to_scan, threads=200):
-    """Manages a multi-threaded TCP port scan to find open ports."""
+
+# --- NEW: ASN Blacklist for Impractical Targets ---
+# Keywords (case-insensitive) for ASNs that are not worth attacking directly.
+IMPRACTICAL_ASN_KEYWORDS = [
+    "CLOUDFLARE",
+    "GOOGLE",
+    "AMAZON-02",  # AWS
+    "MICROSOFT-CORP",  # Azure
+    "AKAMAI",
+    "FASTLY",
+    "INCAPSULA",
+    "OVH"
+]
+
+
+# ... (keep utility functions like resolve_to_ipv4)
+
+# --- NEW: IP REPUTATION CHECKER ---
+def check_ip_reputation(target_ip):
+    """
+    Checks if an IP belongs to a known, heavily protected network (e.g., Cloudflare).
+
+    :param target_ip: The IP address to check.
+    :return: A tuple (is_impractical, description_string).
+    """
+    try:
+        obj = IPWhois(target_ip)
+        results = obj.lookup_whois()
+        asn_description = results.get('asn_description', '').upper()
+
+        for keyword in IMPRACTICAL_ASN_KEYWORDS:
+            if keyword in asn_description:
+                return (True, asn_description)  # Impractical target found
+
+        return (False, asn_description)  # Practical target
+    except Exception:
+        # If the lookup fails for any reason, assume it's a practical target
+        # to avoid accidentally skipping a vulnerable server.
+        return (False, "ASN Lookup Failed")
+
+
+# --- UPDATED: PRE-ATTACK RECONNAISSANCE MODULE ---
+# ... (keep port_scan_worker, open_ports, ports_lock)
+
+def run_port_scan(target_url, ports_to_scan, threads=100):
+    """
+    Manages a multi-threaded TCP port scan and performs an ASN reputation check.
+
+    :return: A dictionary of results, keyed by IP address.
+    """
     ips = counter_strike_helper.get_target_ips(target_url)
     if not ips:
         print(f"[RECON] Could not resolve {target_url}. Aborting scan.")
-        return []
-    target_ip = ips[0]
-    print(f"[RECON] Starting TCP port scan on {target_ip} for {len(ports_to_scan)} ports...")
-    global open_ports
-    open_ports = []
-    port_queue = Queue()
-    for port in ports_to_scan:
-        port_queue.put(port)
-    for _ in range(threads):
-        t = threading.Thread(target=port_scan_worker, args=(target_ip, port_queue))
-        t.daemon = True
-        t.start()
-    port_queue.join()
-    print(f"[RECON] Scan complete. Found {len(open_ports)} open TCP ports.")
-    return sorted(open_ports)
+        return {}
+
+    scan_results = {}
+
+    print("[RECON] Starting ASN reputation and port scan...")
+    for ip in ips:
+        # --- NEW: Perform reputation check first ---
+        is_impractical, asn_desc = check_ip_reputation(ip)
+        print(f"[RECON] IP: {ip} | ASN: {asn_desc} | Impractical: {is_impractical}")
+
+        # Initialize results for this IP
+        scan_results[ip] = {
+            "is_impractical": is_impractical,
+            "asn": asn_desc,
+            "open_ports": []
+        }
+
+        # Skip the detailed port scan if the target is deemed impractical
+        if is_impractical:
+            print(f"[RECON] Skipping detailed port scan for impractical target {ip}.")
+            continue
+
+        # ... (The port scanning logic is the same)
+        global open_ports
+        open_ports = []
+        port_queue = Queue()
+        for port in ports_to_scan: port_queue.put(port)
+        for _ in range(threads):
+            t = threading.Thread(target=port_scan_worker, args=(ip, port_queue))
+            t.daemon = True
+            t.start()
+        port_queue.join()
+
+        scan_results[ip]["open_ports"] = sorted(open_ports)
+
+    print("-" * 60)
+    print("[RECON] Full reconnaissance complete.")
+    return scan_results
 
 # --- 2. ORIGIN IP DISCOVERY MODULE ---
 def find_origin_ip_by_mx(target_domain):
