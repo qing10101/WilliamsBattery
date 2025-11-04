@@ -1,6 +1,6 @@
 # William's Battery - A Multi-Vector DoS Toolkit
 
-![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
+![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Educational Use](https://img.shields.io/badge/purpose-educational-lightgrey.svg)
 
@@ -34,7 +34,7 @@ William's Battery is a powerful, multi-threaded Python-based toolkit for demonst
 
 ## ⚙️ Prerequisites & Installation
 
--   Python 3.8 or newer.
+-   Python 3.12 or newer.
 -   `pip` for installing packages.
 -   **Root or Administrator privileges** to craft and send raw packets.
 -   **Tor Service (Optional):** To use the anonymity feature, the Tor service must be installed and running.
