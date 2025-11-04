@@ -1,0 +1,64 @@
+name: Python CI and Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - 'v*.*.*' # Trigger on version tags like v1.0.0
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"] # Test on multiple Python versions
+
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 # Linter for code style
+
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+  release:
+    name: Create Release
+    needs: test # This job will only run if the 'test' job succeeds
+    runs-on: ubuntu-latest
+    # Only run this job when a new version tag (e.g., v1.2.3) is pushed
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Create Release Notes and Zip Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          # This will create a draft release with the tag name and release notes
+          # based on the commits since the last tag.
+          generate_release_notes: true
+          files: |
+            main.py
+            counter_strike_helper.py
+            recon_helper.py
+            requirements.txt
+            MANUAL.md
+            LICENSE
