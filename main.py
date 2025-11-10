@@ -1,4 +1,4 @@
-# main.py (Updated to integrate H2 Rapid Reset into blended profiles)
+# main.py
 import sys
 import threading
 import time
